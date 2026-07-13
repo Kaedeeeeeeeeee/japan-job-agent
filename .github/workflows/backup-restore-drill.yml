@@ -1,0 +1,58 @@
+name: Weekly backup restore drill
+
+on:
+  schedule:
+    - cron: "43 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: japan_job_agent_drill_source
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d japan_job_agent_drill_source"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/japan_job_agent_drill_source
+      BACKUP_OUTPUT_PATH: /tmp/japan-job-agent-drill.dump
+      BACKUP_INPUT_PATH: /tmp/japan-job-agent-drill.dump
+      RESTORE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/japan_job_agent_restore_drill
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client-16
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - name: Add recoverable fixture row
+        run: psql "$DATABASE_URL" -c "INSERT INTO source_instances(source_kind,tenant_key,base_url) VALUES ('manual','backup-drill','https://example.com')"
+      - run: pnpm backup:database
+      - run: createdb -h 127.0.0.1 -U postgres japan_job_agent_restore_drill
+        env:
+          PGPASSWORD: postgres
+      - run: pnpm backup:restore-verify
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: failed-backup-restore-drill
+          path: /tmp/japan-job-agent-drill.dump
+          retention-days: 7

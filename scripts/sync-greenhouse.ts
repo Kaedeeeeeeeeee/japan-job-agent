@@ -28,9 +28,10 @@ try {
       baseUrl: row.base_url,
     };
     const service = new SourceSyncService(db, connector, store);
+    const invocationKey = process.env.SYNC_INVOCATION_KEY ?? new Date().toISOString().slice(0, 16);
     const result = await service.run({
       source,
-      idempotencyKey: `manual:${new Date().toISOString().slice(0, 13)}`,
+      idempotencyKey: `manual:${invocationKey}`,
       temporalWorkflowId: `manual-greenhouse-${row.tenant_key}`,
       temporalRunId: new Date().toISOString(),
     });

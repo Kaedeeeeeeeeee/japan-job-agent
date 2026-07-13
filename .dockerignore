@@ -1,0 +1,11 @@
+.git
+.github
+.data
+**/.next
+.playwright-cli
+**/node_modules
+output
+tmp
+coverage
+*.log
+*.tsbuildinfo

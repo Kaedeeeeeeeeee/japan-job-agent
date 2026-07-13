@@ -42,6 +42,12 @@ export interface CompensationFact {
   isCalculated: boolean;
 }
 
+export interface ExperienceRequirementFact {
+  minimumYears: number;
+  originalText: string;
+  requirementKind: "required" | "preferred";
+}
+
 export interface ParsedJob extends Record<string, unknown> {
   title: string;
   descriptionText: string;
@@ -51,23 +57,28 @@ export interface ParsedJob extends Record<string, unknown> {
   languages: Fact<LanguageFact>;
   skills: Fact<SkillFact>;
   compensation: Fact<CompensationFact>;
+  experienceRequirements: Fact<ExperienceRequirementFact>;
 }
 
 export class DeterministicJobParser implements JobParser {
   readonly parserKey = "deterministic-job";
-  readonly parserVersion = "1.1.0";
+  readonly parserVersion = "1.3.0";
   readonly schemaVersion = "job-v1";
 
   async parse(version: SourceJobVersion, _context: ParserContext): Promise<ExtractionCandidate> {
     try {
       const document = sourceDocument(version.raw);
       const evidence: EvidenceCandidate[] = [];
+      if (document.title.length > 0) {
+        evidence.push(quote("title", document.title, version.sourceUrl, "source title"));
+      }
       const employmentTypes = extractEmployment(document, version.sourceUrl, evidence);
       const visaSupport = extractVisa(document.searchText, version.sourceUrl, evidence);
       const locations = extractLocations(document, version.sourceUrl, evidence);
       const languages = extractLanguages(document.searchText, version.sourceUrl, evidence);
       const skills = extractSkills(document.searchText, version.sourceUrl, evidence);
       const compensation = extractCompensation(document.searchText, version.sourceUrl, evidence);
+      const experienceRequirements = extractExperienceRequirements(document.searchText, version.sourceUrl, evidence);
       const structured: ParsedJob = {
         title: document.title,
         descriptionText: document.descriptionText,
@@ -77,6 +88,7 @@ export class DeterministicJobParser implements JobParser {
         languages,
         skills,
         compensation,
+        experienceRequirements,
       };
       return {
         status: "succeeded",
@@ -277,6 +289,29 @@ function extractCompensation(input: string, sourceUrl: string, evidence: Evidenc
   const amount = Number(monthly[1].replaceAll(",", ""));
   return { state: "known", values: [{ compensationKind: "base", currency: "JPY", period: "month",
     minimumAmount: amount, maximumAmount: amount, isCalculated: false }] };
+}
+
+function extractExperienceRequirements(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<ExperienceRequirementFact> {
+  const results: ExperienceRequirementFact[] = [];
+  const patterns = [
+    /(?:実務経験|開発経験|業務経験|エンジニア経験)[^。\n]{0,24}?(\d{1,2})\s*年(?:以上|超)/gi,
+    /(?:at\s+least\s+)?(\d{1,2})\+?\s+years?[^.\n]{0,36}(?:experience|professional)/gi,
+  ];
+  for (const pattern of patterns) {
+    for (const match of input.matchAll(pattern)) {
+      const years = Number(match[1]);
+      if (!Number.isInteger(years) || years < 1 || years > 30) continue;
+      const originalText = match[0];
+      const index = match.index ?? 0;
+      const window = input.slice(Math.max(0, index - 20), index + originalText.length + 20);
+      results.push({ minimumYears: years, originalText,
+        requirementKind: /歓迎|尚可|preferred|nice to have/i.test(window) ? "preferred" : "required" });
+      evidence.push(quote("experienceRequirements", originalText, sourceUrl, pattern.source));
+    }
+  }
+  const unique = results.filter((value, index) => results.findIndex((candidate) => candidate.minimumYears === value.minimumYears
+    && candidate.requirementKind === value.requirementKind) === index);
+  return fact(unique);
 }
 
 function fact<T>(values: T[]): Fact<T> {

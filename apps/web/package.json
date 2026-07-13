@@ -1,0 +1,23 @@
+{
+  "name": "@jja/web",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}"
+  },
+  "dependencies": {
+    "lucide-react": "1.24.0",
+    "next": "16.2.10",
+    "next-auth": "5.0.0-beta.31",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}

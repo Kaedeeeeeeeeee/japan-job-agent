@@ -95,11 +95,14 @@ export class CanonicalService {
     if (primary === undefined) throw new Error(`Canonical ${canonicalJobId} has no active primary`);
     const structured = mergeStructured(primary, activeInputs.filter((item) => item !== primary));
     const applicationUrl = primary.canonical_url;
-    const contentHash = createHash("sha256").update(stableJson({ version: "canonical-v1", applicationUrl, structured })).digest("hex");
+    const contentHash = createHash("sha256").update(stableJson({
+      version: "canonical-v2", applicationUrl, structured,
+      inputs: activeInputs.map((value) => ({ extractionId: value.extraction_id, role: value.source_role })),
+    })).digest("hex");
     const versionId = randomUUID();
     const inserted = await sql<{ id: string }>`INSERT INTO canonical_job_versions(
         id, canonical_job_id, materialization_version, title, application_url, structured_result, content_hash
-      ) VALUES (${versionId}::uuid, ${canonicalJobId}::uuid, 'canonical-v1',
+      ) VALUES (${versionId}::uuid, ${canonicalJobId}::uuid, 'canonical-v2',
       ${typeof structured.title === "string" ? structured.title : "Untitled"}, ${applicationUrl},
       ${JSON.stringify(structured)}::jsonb, ${contentHash})
       ON CONFLICT (canonical_job_id, content_hash) DO NOTHING RETURNING id`.execute(this.db);
@@ -192,6 +195,14 @@ export class CanonicalService {
           VALUES (${versionId}::uuid, ${input.extraction_id}::uuid, ${input.source_role})`.execute(trx);
         await sql`INSERT INTO canonical_field_evidence(canonical_job_version_id, field_path, evidence_id)
           SELECT ${versionId}::uuid, field_path, id FROM evidence WHERE source_job_extraction_id=${input.extraction_id}::uuid
+          ON CONFLICT DO NOTHING`.execute(trx);
+        await sql`INSERT INTO canonical_field_evidence(canonical_job_version_id, field_path, evidence_id)
+          SELECT ${versionId}::uuid, 'sourceVerification', e.id
+          FROM source_job_records r
+          JOIN company_source_relationships csr ON csr.source_instance_id=r.source_instance_id
+            AND csr.verification_state='verified' AND csr.valid_to IS NULL
+          JOIN evidence e ON e.company_source_relationship_id=csr.id
+          WHERE r.id=${input.source_job_record_id}::uuid
           ON CONFLICT DO NOTHING`.execute(trx);
       }
       await sql`UPDATE canonical_jobs SET current_version_id=${versionId}::uuid, updated_at=now(), lifecycle_state=CASE WHEN EXISTS(

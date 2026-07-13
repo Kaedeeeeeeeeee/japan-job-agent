@@ -32,7 +32,7 @@ describe("DeterministicJobParser", () => {
       title: "27卒 Web / AI Engineer",
       absolute_url: "https://example.com/jobs/27",
       location: { name: "Tokyo (Remote/Hybrid)" },
-      content: `<p>雇用形態: 正社員 または 契約社員</p><p>応募要件: JLPT N1、TypeScript、React、Node.js、AI</p>
+      content: `<p>雇用形態: 正社員 または 契約社員</p><p>応募要件: JLPT N1、TypeScript、React、Node.js、AI、Web開発経験3年以上</p>
         <p>Visa sponsorship is available. No visa sponsorship for this employment track.</p><p>年収 400万円〜600万円</p>`,
     });
     const result = await new DeterministicJobParser().parse(version(raw), context);
@@ -42,7 +42,8 @@ describe("DeterministicJobParser", () => {
     expect(result.structured.locations).toMatchObject({ state: "known" });
     expect(result.structured.languages).toMatchObject({ state: "known" });
     expect(result.structured.compensation).toMatchObject({ state: "known" });
-    for (const field of ["employmentTypes", "visaSupport", "locations", "languages", "skills", "compensation"]) {
+    expect(result.structured.experienceRequirements).toMatchObject({ state: "known", values: [{ minimumYears: 3 }] });
+    for (const field of ["title", "employmentTypes", "visaSupport", "locations", "languages", "skills", "compensation"]) {
       expect(result.evidence.some((item) => item.fieldPath === field), `${field} evidence`).toBe(true);
     }
   });

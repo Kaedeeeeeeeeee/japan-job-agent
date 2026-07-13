@@ -123,6 +123,36 @@ integration("PostgreSQL foundation invariants", () => {
     expect(replay).toBe(false);
     expect(effects).toBe(1);
   });
+
+  it("persists an idempotent recommendation run and independent job workflow state", async () => {
+    const extraction = await createExtraction(db);
+    const canonicalJobId = randomUUID();
+    const canonicalVersionId = randomUUID();
+    const profileId = randomUUID();
+    const profileVersionId = randomUUID();
+    const runId = randomUUID();
+    const runKey = randomUUID().replaceAll("-", "").repeat(2);
+    await sql`INSERT INTO canonical_jobs(id) VALUES (${canonicalJobId}::uuid)`.execute(db);
+    await sql`INSERT INTO canonical_job_versions(id,canonical_job_id,materialization_version,title,application_url,structured_result,content_hash)
+      VALUES (${canonicalVersionId}::uuid,${canonicalJobId}::uuid,'test','Engineer','https://example.com/apply','{}'::jsonb,${randomUUID().replaceAll("-", "").repeat(2)})`.execute(db);
+    await sql`INSERT INTO profiles(id,profile_key) VALUES (${profileId}::uuid,${`test-${profileId}`})`.execute(db);
+    await sql`INSERT INTO profile_versions(id,profile_id,version,schema_version,structured_profile,source_fingerprint)
+      VALUES (${profileVersionId}::uuid,${profileId}::uuid,1,'profile-v1','{}'::jsonb,${"f".repeat(64)})`.execute(db);
+    await sql`INSERT INTO recommendation_runs(id,user_key,run_key,profile_version_id,ranking_version,eligible_count,input_count)
+      VALUES (${runId}::uuid,'github:test',${runKey},${profileVersionId}::uuid,'test-v1',1,1)`.execute(db);
+    await sql`INSERT INTO recommendation_results(recommendation_run_id,canonical_job_id,canonical_job_version_id,rank,score,eligible,score_breakdown,explanation)
+      VALUES (${runId}::uuid,${canonicalJobId}::uuid,${canonicalVersionId}::uuid,1,83,true,'[]'::jsonb,'{}'::jsonb)`.execute(db);
+    await expect(sql`INSERT INTO recommendation_runs(user_key,run_key,profile_version_id,ranking_version,eligible_count,input_count)
+      VALUES ('github:test',${runKey},${profileVersionId}::uuid,'test-v1',1,1)`.execute(db)).rejects.toThrow();
+    await sql`INSERT INTO job_user_states(user_key,canonical_job_id,saved) VALUES ('github:test',${canonicalJobId}::uuid,true)
+      ON CONFLICT(user_key,canonical_job_id) DO UPDATE SET saved=excluded.saved`.execute(db);
+    await sql`INSERT INTO job_user_states(user_key,canonical_job_id,applied_at) VALUES ('github:test',${canonicalJobId}::uuid,now())
+      ON CONFLICT(user_key,canonical_job_id) DO UPDATE SET applied_at=excluded.applied_at`.execute(db);
+    const state = await sql<{ saved: boolean; applied: boolean }>`SELECT saved,applied_at IS NOT NULL applied FROM job_user_states
+      WHERE user_key='github:test' AND canonical_job_id=${canonicalJobId}::uuid`.execute(db);
+    expect(state.rows[0]).toEqual({ saved: true, applied: true });
+    expect(extraction.recordId).toBeTruthy();
+  });
 });
 
 async function createExtraction(db: Kysely<OutboxDatabase>): Promise<{ recordId: string; extractionId: string }> {
