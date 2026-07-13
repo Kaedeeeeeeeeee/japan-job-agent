@@ -16,9 +16,13 @@
     "test:watch": "vitest",
     "db:migrate": "tsx packages/db/src/migrate.ts",
     "db:verify": "tsx packages/db/src/verify-migrations.ts",
+    "live:audit": "tsx scripts/audit-greenhouse-tenants.ts",
+    "source:seed-verified": "tsx scripts/seed-verified-greenhouse.ts",
+    "sync:greenhouse": "tsx scripts/sync-greenhouse.ts",
     "dev:api": "tsx watch apps/api/src/main.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1085.0",
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-fastify": "11.1.28",

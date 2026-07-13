@@ -28,3 +28,18 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm 
 
 - [v0.2 delta specification](./docs/spec/v0.2-foundation-delta.md)
 - [Architecture decisions](./docs/adr/README.md)
+
+## Verified Greenhouse vertical slice
+
+```bash
+# Verify official career-site links and current Japan jobs.
+pnpm live:audit
+
+# Persist the three verified tenant/company relationships after a fresh audit.
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm source:seed-verified
+
+# Fetch exact record responses and store immutable raw objects.
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm sync:greenhouse -- paypay paypaycard paypaysec
+```
+
+Without S3 variables, raw objects are private local files under `.data/`. With `S3_BUCKET` and optional `S3_ENDPOINT`, the same command uses S3-compatible private storage. Source health and sync audits are available at `/admin/sources`, `/admin/sync-runs/:id`, and the minimal `/admin/review` page.

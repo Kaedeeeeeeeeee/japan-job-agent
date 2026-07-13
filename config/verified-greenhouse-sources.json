@@ -1,0 +1,24 @@
+[
+  {
+    "companyName": "PayPay株式会社",
+    "officialDomain": "about.paypay.ne.jp",
+    "officialCareerUrl": "https://about.paypay.ne.jp/career/",
+    "tenantKey": "paypay",
+    "boardUrl": "https://boards.greenhouse.io/paypay"
+  },
+  {
+    "companyName": "PayPayカード株式会社",
+    "officialDomain": "www.paypay-card.co.jp",
+    "officialCareerUrl": "https://www.paypay-card.co.jp/recruit/",
+    "tenantKey": "paypaycard",
+    "boardUrl": "https://boards.greenhouse.io/paypaycard/"
+  },
+  {
+    "companyName": "PayPay証券株式会社",
+    "officialDomain": "www.paypay-sec.co.jp",
+    "officialCareerUrl": "https://www.paypay-sec.co.jp/corporate/recruit/",
+    "tenantKey": "paypaysec",
+    "boardUrl": "https://boards.greenhouse.io/paypaysec/"
+  }
+]
+
