@@ -1,9 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Body, Controller, Get, Inject, Param, Put, Query } from "@nestjs/common";
+import {
+  Body, ConflictException, Controller, Get, HttpCode, Inject, NotFoundException, Param, Post, Put, Query,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { z } from "zod";
 import type { SafeProfile } from "../../../packages/profile/src/build-profile.js";
 import { evaluateJob, type JobMatchResult } from "../../../packages/matching/src/evaluate-job.js";
 import { DatabaseService } from "./database.service.js";
+import { evaluateRefreshPolicy, type RefreshPolicyResult } from "../../../packages/refresh/src/refresh-policy.js";
+import { sourceSyncWorkflow } from "../../../packages/workflows/src/source-sync-workflow.js";
 
 const USER_KEY = "github:Kaedeeeeeeeeee";
 const RANKING_VERSION = "deterministic-v1";
@@ -22,9 +28,24 @@ interface JobRow {
   source_key: string;
   fetched_at: Date;
   source_health: string;
+  source_instance_id: string;
+  interval_hours: number;
+  stale_refresh_allowed: boolean;
   saved: boolean;
   hidden: boolean;
   applied_at: Date | null;
+}
+interface RefreshCandidateRow {
+  canonical_job_id: string;
+  lifecycle_state: "active" | "suspect" | "closed";
+  source_instance_id: string;
+  source_kind: string;
+  fetched_at: Date;
+  interval_hours: number;
+  stale_refresh_allowed: boolean;
+  source_verified: boolean;
+  saved: boolean;
+  applied: boolean;
 }
 interface EvidenceRow {
   field_path: string;
@@ -69,6 +90,12 @@ export class AgentController {
         applicationUrl: row.application_url, sourceKind: row.source_kind, sourceKey: row.source_key,
         fetchedAt: row.fetched_at.toISOString(), sourceHealth: row.source_health,
         state: { saved: row.saved, hidden: row.hidden, appliedAt: row.applied_at?.toISOString() ?? null },
+        refresh: evaluateRefreshPolicy({
+          lifecycleState: row.lifecycle_state, saved: row.saved, applied: row.applied_at !== null,
+          sourceVerified: row.verified_official_source, sourceKind: row.source_kind,
+          staleRefreshAllowed: row.stale_refresh_allowed, fetchedAt: row.fetched_at,
+          intervalHours: row.interval_hours, now: new Date(),
+        }),
         evidence: evidenceRows.rows.map((value) => ({
           id: value.evidence_id, field: value.field_path, quote: value.quoted_text,
           sourceUrl: value.source_url, locator: value.locator,
@@ -108,13 +135,85 @@ export class AgentController {
       input.saved ?? null, input.hidden ?? null, input.applied ?? null, appliedAt ?? null,
     ]);
     const state = result.rows[0];
-    return { canonicalJobId, saved: state?.saved ?? false, hidden: state?.hidden ?? false, appliedAt: state?.applied_at?.toISOString() ?? null };
+    const refresh = await this.refreshPolicy(canonicalJobId);
+    return {
+      canonicalJobId, saved: state?.saved ?? false, hidden: state?.hidden ?? false,
+      appliedAt: state?.applied_at?.toISOString() ?? null, refresh,
+    };
+  }
+
+  @Post("/jobs/:id/refresh")
+  @HttpCode(202)
+  async requestRefresh(@Param("id") id: string) {
+    const canonicalJobId = z.string().uuid().parse(id);
+    const candidate = await this.refreshCandidate(canonicalJobId);
+    if (candidate === undefined) throw new NotFoundException("Canonical Job does not exist");
+    const policy = policyFor(candidate);
+    if (!policy.eligible) throw new ConflictException({ error: "refresh_not_allowed", reason: policy.reason, staleAt: policy.staleAt });
+
+    const hourBucket = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString();
+    const requestKey = createHash("sha256").update(`${USER_KEY}\0${candidate.source_instance_id}\0${hourBucket}`).digest("hex");
+    const requestId = randomUUID();
+    const inserted = await this.database.query<{ id: string; status: string; temporal_workflow_id: string | null }>(`INSERT INTO on_demand_refresh_requests(
+        id,user_key,canonical_job_id,source_instance_id,request_key,status
+      ) VALUES ($1,$2,$3,$4,$5,'requested')
+      ON CONFLICT(user_key,request_key) DO NOTHING RETURNING id,status,temporal_workflow_id`, [
+      requestId, USER_KEY, canonicalJobId, candidate.source_instance_id, requestKey,
+    ]);
+    let request = inserted.rows[0];
+    const deduplicated = request === undefined;
+    if (request === undefined) {
+      const existing = await this.database.query<{ id: string; status: string; temporal_workflow_id: string | null }>(
+        "SELECT id,status,temporal_workflow_id FROM on_demand_refresh_requests WHERE user_key=$1 AND request_key=$2",
+        [USER_KEY, requestKey],
+      );
+      request = existing.rows[0];
+      if (request === undefined) throw new ServiceUnavailableException("Refresh request could not be recovered");
+      if (request.status === "failed") {
+        throw new ServiceUnavailableException({ error: "recent_refresh_failed", requestId: request.id });
+      }
+      if (request.status !== "requested") return { accepted: true, deduplicated: true, request };
+    }
+
+    const persistedRequestId = request.id;
+    const workflowId = `on-demand-refresh-${persistedRequestId}`;
+    let connection: Connection | undefined;
+    try {
+      connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS ?? "127.0.0.1:7233" });
+      const temporal = new Client({ connection, namespace: process.env.TEMPORAL_NAMESPACE ?? "default" });
+      try {
+        await temporal.workflow.start(sourceSyncWorkflow, {
+          taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? "japan-job-agent",
+          workflowId,
+          args: [{ sourceInstanceId: candidate.source_instance_id, refreshRequestId: persistedRequestId }],
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
+      }
+    } catch (error) {
+      await this.database.query(`UPDATE on_demand_refresh_requests SET status='failed',temporal_workflow_id=$2,
+        completed_at=now(),failure_code='temporal_start_failed',failure_detail=$3::jsonb
+        WHERE id=$1 AND status='requested'`, [
+        persistedRequestId, workflowId, JSON.stringify({ message: error instanceof Error ? error.message : String(error) }),
+      ]);
+      throw new ServiceUnavailableException("Refresh workflow could not be started");
+    } finally {
+      await connection?.close();
+    }
+    await this.database.query(`UPDATE on_demand_refresh_requests SET status='started',temporal_workflow_id=$2,started_at=now()
+      WHERE id=$1 AND status='requested'`, [persistedRequestId, workflowId]);
+    return {
+      accepted: true,
+      deduplicated,
+      request: { id: persistedRequestId, status: "started", temporal_workflow_id: workflowId },
+    };
   }
 
   private async loadJobs(): Promise<JobRow[]> {
     const result = await this.database.query<JobRow>(`SELECT c.id canonical_job_id,v.id canonical_job_version_id,
       c.lifecycle_state,v.title,v.application_url,v.structured_result,source.fetched_at,source.source_kind,
       source.tenant_key source_key,source.health_state source_health,company.display_name company_name,
+      source.source_instance_id,schedule.interval_hours,schedule.stale_refresh_allowed,
       COALESCE(state.saved,false) saved,COALESCE(state.hidden,false) hidden,state.applied_at,
       EXISTS(SELECT 1 FROM canonical_job_sources verified_cjs
         JOIN source_job_records verified_record ON verified_record.id=verified_cjs.source_job_record_id
@@ -124,17 +223,41 @@ export class AgentController {
           AND verified_source.verification_state='verified' AND csr.verification_state='verified' AND csr.valid_to IS NULL
       ) verified_official_source
       FROM canonical_jobs c JOIN canonical_job_versions v ON v.id=c.current_version_id
-      JOIN LATERAL (SELECT si.source_kind,si.tenant_key,si.health_state,sv.fetched_at,sjr.source_instance_id
+      JOIN LATERAL (SELECT si.source_kind,si.tenant_key,si.health_state,sjr.last_seen_at fetched_at,sjr.source_instance_id
         FROM canonical_job_sources cjs JOIN source_job_records sjr ON sjr.id=cjs.source_job_record_id
         JOIN source_instances si ON si.id=sjr.source_instance_id
-        JOIN source_job_versions sv ON sv.source_job_record_id=sjr.id
         WHERE cjs.canonical_job_id=c.id AND cjs.source_role='primary' AND cjs.active_to IS NULL
-        ORDER BY sv.fetched_at DESC LIMIT 1) source ON true
+        LIMIT 1) source ON true
       LEFT JOIN LATERAL (SELECT co.display_name FROM company_source_relationships csr JOIN companies co ON co.id=csr.company_id
         WHERE csr.source_instance_id=source.source_instance_id AND csr.verification_state='verified' AND csr.valid_to IS NULL
         ORDER BY csr.valid_from DESC LIMIT 1) company ON true
+      JOIN source_schedules schedule ON schedule.source_instance_id=source.source_instance_id
       LEFT JOIN job_user_states state ON state.canonical_job_id=c.id AND state.user_key=$1`, [USER_KEY]);
     return result.rows;
+  }
+
+  private async refreshPolicy(canonicalJobId: string): Promise<RefreshPolicyResult | null> {
+    const candidate = await this.refreshCandidate(canonicalJobId);
+    return candidate === undefined ? null : policyFor(candidate);
+  }
+
+  private async refreshCandidate(canonicalJobId: string): Promise<RefreshCandidateRow | undefined> {
+    const result = await this.database.query<RefreshCandidateRow>(`SELECT c.id canonical_job_id,c.lifecycle_state,
+      source.source_instance_id,source.source_kind,source.fetched_at,schedule.interval_hours,schedule.stale_refresh_allowed,
+      COALESCE(state.saved,false) saved,state.applied_at IS NOT NULL applied,
+      (source.verification_state='verified' AND EXISTS(
+        SELECT 1 FROM company_source_relationships csr WHERE csr.source_instance_id=source.source_instance_id
+          AND csr.verification_state='verified' AND csr.valid_to IS NULL)) source_verified
+      FROM canonical_jobs c
+      JOIN LATERAL (SELECT si.id source_instance_id,si.source_kind,si.verification_state,sjr.last_seen_at fetched_at
+        FROM canonical_job_sources cjs JOIN source_job_records sjr ON sjr.id=cjs.source_job_record_id
+        JOIN source_instances si ON si.id=sjr.source_instance_id
+        WHERE cjs.canonical_job_id=c.id AND cjs.source_role='primary' AND cjs.active_to IS NULL
+        LIMIT 1) source ON true
+      JOIN source_schedules schedule ON schedule.source_instance_id=source.source_instance_id
+      LEFT JOIN job_user_states state ON state.canonical_job_id=c.id AND state.user_key=$1
+      WHERE c.id=$2`, [USER_KEY, canonicalJobId]);
+    return result.rows[0];
   }
 
   private inView(job: { eligible: boolean; state: { saved: boolean; hidden: boolean; appliedAt: string | null } }, view: string): boolean {
@@ -171,4 +294,13 @@ export class AgentController {
       return id;
     });
   }
+}
+
+function policyFor(row: RefreshCandidateRow): RefreshPolicyResult {
+  return evaluateRefreshPolicy({
+    lifecycleState: row.lifecycle_state, saved: row.saved, applied: row.applied,
+    sourceVerified: row.source_verified, sourceKind: row.source_kind,
+    staleRefreshAllowed: row.stale_refresh_allowed, fetchedAt: row.fetched_at,
+    intervalHours: row.interval_hours, now: new Date(),
+  });
 }

@@ -48,6 +48,10 @@ integration("verified Greenhouse full sync", () => {
     const results = [];
     for (let attempt = 0; attempt < 10; attempt += 1) {
       results.push(await service.run({ source, idempotencyKey: `fixture-run-${attempt}` }));
+      if (attempt === 0) {
+        await sql`UPDATE source_job_records SET last_seen_at='2020-01-01T00:00:00Z'
+          WHERE source_instance_id=${source.id}::uuid`.execute(db);
+      }
     }
     expect(results.every((result) => result.snapshot?.kind === "authoritative")).toBe(true);
     const counts = await sql<{ records: string; versions: string; events: string; runs: string }>`SELECT
@@ -57,6 +61,9 @@ integration("verified Greenhouse full sync", () => {
         (SELECT id::text FROM source_job_records WHERE source_instance_id = ${source.id}::uuid)) AS events,
       (SELECT count(*)::text FROM source_sync_runs WHERE source_instance_id = ${source.id}::uuid) AS runs`.execute(db);
     expect(counts.rows[0]).toEqual({ records: "2", versions: "2", events: "2", runs: "10" });
+    const confirmations = await sql<{ all_recent: boolean }>`SELECT bool_and(last_seen_at > '2020-01-01T00:00:00Z') all_recent
+      FROM source_job_records WHERE source_instance_id=${source.id}::uuid`.execute(db);
+    expect(confirmations.rows[0]?.all_recent).toBe(true);
     expect(store.objects.size).toBe(2);
   });
 

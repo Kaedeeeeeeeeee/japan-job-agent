@@ -17,6 +17,7 @@ const navigation = [
 export function Dashboard({ initialData, view, unavailable, management }: { initialData: JobsResponse; view: string; unavailable: string | null; management: unknown }) {
   const [jobs, setJobs] = useState(initialData.jobs);
   const [selectedId, setSelectedId] = useState(initialData.jobs[0]?.canonicalJobId ?? null);
+  const [refreshMessages, setRefreshMessages] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   const selected = jobs.find((job) => job.canonicalJobId === selectedId) ?? jobs[0] ?? null;
   const title = view === "saved" ? "保存済みの求人" : view === "applied" ? "応募管理" : "今日のおすすめ";
@@ -28,9 +29,37 @@ export function Dashboard({ initialData, view, unavailable, management }: { init
         method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch),
       });
       if (!response.ok) return;
-      const next = await response.json() as { saved: boolean; hidden: boolean; appliedAt: string | null };
-      setJobs((current) => current.map((item) => item.canonicalJobId === job.canonicalJobId ? { ...item, state: next } : item)
+      const next = await response.json() as JobView["state"] & { refresh: JobView["refresh"] };
+      setJobs((current) => current.map((item) => item.canonicalJobId === job.canonicalJobId
+        ? { ...item, state: { saved: next.saved, hidden: next.hidden, appliedAt: next.appliedAt }, refresh: next.refresh }
+        : item)
         .filter((item) => view !== "recommendations" || !item.state.hidden));
+    });
+  }
+
+  function requestRefresh(job: JobView) {
+    startTransition(async () => {
+      setRefreshMessages((current) => ({ ...current, [job.canonicalJobId]: "更新を開始しています…" }));
+      const response = await fetch(`/api/jobs/${job.canonicalJobId}/refresh`, { method: "POST" });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({})) as { error?: string; message?: string; reason?: string };
+        setRefreshMessages((current) => ({
+          ...current,
+          [job.canonicalJobId]: refreshErrorLabel(error.reason ?? error.error ?? error.message),
+        }));
+        return;
+      }
+      const result = await response.json() as { deduplicated?: boolean; request?: { status?: string } };
+      const duplicateMessage = result.request?.status === "succeeded"
+        ? "同じ時間帯に公式情報を確認済みです。"
+        : "同じソースの更新が進行中です。";
+      setRefreshMessages((current) => ({
+        ...current,
+        [job.canonicalJobId]: result.deduplicated ? duplicateMessage : "公式ソースの更新を受け付けました。",
+      }));
+      setJobs((current) => current.map((item) => item.canonicalJobId === job.canonicalJobId
+        ? { ...item, refresh: { ...item.refresh, eligible: false } }
+        : item));
     });
   }
 
@@ -65,7 +94,8 @@ export function Dashboard({ initialData, view, unavailable, management }: { init
            {jobs.map((job) => <JobRow key={job.canonicalJobId} job={job} selected={job.canonicalJobId === selected?.canonicalJobId} onSelect={() => setSelectedId(job.canonicalJobId)} />)}
            <p className="score-footnote">スコアは公開情報と固定ルールに基づく一致度です（100点満点）。</p>
          </section>
-         {selected !== null && <JobDetail job={selected} evidenceMap={evidenceMap} pending={pending} updateState={updateState} />}
+         {selected !== null && <JobDetail job={selected} evidenceMap={evidenceMap} pending={pending}
+           refreshMessage={refreshMessages[selected.canonicalJobId] ?? null} updateState={updateState} requestRefresh={requestRefresh} />}
        </div>}
     </section>
   </main>;
@@ -112,9 +142,11 @@ function JobRow({ job, selected, onSelect }: { job: JobView; selected: boolean; 
   </button>;
 }
 
-function JobDetail({ job, evidenceMap, pending, updateState }: {
+function JobDetail({ job, evidenceMap, pending, updateState, refreshMessage, requestRefresh }: {
   job: JobView; evidenceMap: Map<string, EvidenceView>; pending: boolean;
   updateState: (job: JobView, patch: { saved?: boolean; hidden?: boolean; applied?: boolean }) => void;
+  refreshMessage: string | null;
+  requestRefresh: (job: JobView) => void;
 }) {
   const citedEvidence = [...new Set([...job.matched, ...job.gaps].flatMap((item) => item.evidenceIds))]
     .map((id) => evidenceMap.get(id)).filter((value): value is EvidenceView => value !== undefined);
@@ -140,7 +172,12 @@ function JobDetail({ job, evidenceMap, pending, updateState }: {
       <button type="button" disabled={pending} className={job.state.saved ? "text-action active" : "text-action"} onClick={() => updateState(job, { saved: !job.state.saved })}><Bookmark size={17} />保存</button>
       <button type="button" disabled={pending} className="text-action" onClick={() => updateState(job, { hidden: true })}><EyeOff size={17} />非表示</button>
       <button type="button" disabled={pending} className={job.state.appliedAt !== null ? "text-action active" : "text-action"} onClick={() => updateState(job, { applied: job.state.appliedAt === null })}><CheckCircle2 size={17} />応募済み</button>
+      {(job.state.saved || job.state.appliedAt !== null) ? <button type="button" disabled={pending || !job.refresh.eligible}
+        className="text-action" title={refreshPolicyLabel(job.refresh)} onClick={() => requestRefresh(job)}>
+        <RefreshCw size={17} className={pending ? "spin" : ""} />{job.refresh.eligible ? "公式情報を更新" : job.refresh.stale ? "更新受付済み" : "最新"}
+      </button> : null}
       <a className="apply-button" href={job.applicationUrl} target="_blank" rel="noreferrer">公式サイトで応募 <ArrowUpRight size={17} /></a>
+      <span className="refresh-feedback" aria-live="polite">{refreshMessage}</span>
     </footer>
   </aside>;
 }
@@ -170,4 +207,18 @@ function locationLabel(job: JobView): string {
 function employmentLabel(job: JobView): string {
   const value = job.scoreBreakdown.find((item) => item.key === "employment");
   return value?.score === value?.maximum ? "正社員" : "雇用形態を確認";
+}
+function refreshPolicyLabel(refresh: JobView["refresh"]): string {
+  if (refresh.eligible) return "公式ソースを今すぐ再確認します";
+  if (refresh.reason === "source_not_stale") return `次回更新可能: ${formatDateTime(refresh.staleAt)}`;
+  if (refresh.reason === "save_or_apply_required") return "保存または応募済みにすると、古い公式情報を再確認できます";
+  if (refresh.reason === "source_not_refreshable") return "このソースはオンデマンド更新の対象外です";
+  return "現在は更新できません";
+}
+function refreshErrorLabel(reason?: string): string {
+  if (reason === "source_not_stale") return "公式情報はまだ最新です。";
+  if (reason === "save_or_apply_required") return "保存または応募済みの求人だけ更新できます。";
+  if (reason === "source_not_refreshable") return "このソースは更新対象外です。";
+  if (reason === "recent_refresh_failed") return "直近の更新に失敗しました。定期同期の状態を確認してください。";
+  return "更新を開始できませんでした。時間を置いて再試行してください。";
 }

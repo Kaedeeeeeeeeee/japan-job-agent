@@ -21,3 +21,14 @@ The browser acceptance screenshot is `output/playwright/week4-real-dashboard.png
 - PostgreSQL 16 custom backup (1,856,839 bytes) restored into an isolated database with all 7 migrations, 11 sources, and 147 Canonical Jobs.
 
 Cloud creation was not attempted without operator authentication: `railway whoami` returns unauthorized. The runbook and containers are ready, but Railway project creation, Bucket credentials, GitHub OAuth, managed backups, and the JPY 5,000 alert require a company-owned authenticated Railway session.
+
+## Post-acceptance hardening
+
+- Production API access is protected independently with a server-only internal Bearer token; `/health` is the only public route and production startup fails closed without a 32+ character token.
+- Saved or applied stale jobs can request an audited on-demand Temporal refresh. Verified source relationship, active lifecycle, source policy, 12/24-hour staleness, and a one-hour source request key are enforced by the API, not inferred by the UI.
+- Freshness uses `source_job_records.last_seen_at`. This advances after a successful unchanged response while immutable Raw Version count remains stable.
+- A real schema.org job completed the local path `202 -> started -> succeeded`; its official confirmation timestamp advanced and an immediate repeat returned `source_not_stale`.
+- A simulated API crash window left an hourly request at `requested`; the next call recovered it with the same request ID and deterministic Workflow ID, then completed a real PayPay full sync as `succeeded`.
+- A non-existent Source drill failed the Pipeline as expected; the Workflow failure Finalizer moved the audit to `failed`, set `completed_at`, and recorded a terminal Pipeline failure instead of leaving it at `retrying`.
+- Playwright verified the saved-job refresh interaction at 1440×1000 and 390×844. Stable screenshots are `output/playwright/restricted-refresh-complete-desktop.png` and `output/playwright/restricted-refresh-complete-mobile.png`.
+- The refreshed PostgreSQL 16 Worker image produced a 2,050,245-byte atomic custom dump (`sha256:4f74d45ca160df29ebd36236c8e904cb9e875d4f4819198384eee5b309b24ad4`, mode `0600`) and restored it into an isolated database with 8 migrations, 11 sources, 148 Canonical Jobs, and 4 refresh audits. A deliberate incompatible-client failure preserved the previous target SHA and left zero temporary files.

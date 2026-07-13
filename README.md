@@ -86,6 +86,8 @@ pnpm build:web
 
 Production ignores `AUTH_BYPASS_LOCAL`; GitHub OAuth must resolve to `Kaedeeeeeeeeee`. Saved, hidden, and applied states are persisted through `/agent/jobs/:id/state`. Recommendations, score breakdowns, explanations, and the Canonical Version/Evidence inputs are versioned in PostgreSQL.
 
+The API also requires a server-only `API_INTERNAL_TOKEN` in production; only `/health` remains unauthenticated. A saved or applied job whose official confirmation is older than its 12/24-hour source interval can request a restricted refresh from the detail view. The request is audited, deduplicated per source and hour, executed by Temporal, and uses `source_job_records.last_seen_at` rather than creating a Raw Version when the official content is unchanged.
+
 ## Temporal and operations
 
 ```bash

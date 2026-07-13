@@ -3,13 +3,14 @@ import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
 
 const databaseUrl = required("DATABASE_URL");
 const timestamp = new Date().toISOString().replaceAll(":", "-");
 const outputPath = path.resolve(process.env.BACKUP_OUTPUT_PATH ?? `.data/backups/japan-job-agent-${timestamp}.dump`);
-await fs.mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-await run("pg_dump", ["--format=custom", "--compress=9", "--no-owner", "--no-acl", `--file=${outputPath}`, databaseUrl]);
-await fs.chmod(outputPath, 0o600);
+await replaceWithAtomicFile(outputPath, async (temporaryPath) => run(process.env.PG_DUMP_BIN ?? "pg_dump", [
+  "--format=custom", "--compress=9", "--no-owner", "--no-acl", `--file=${temporaryPath}`, databaseUrl,
+]));
 const body = await fs.readFile(outputPath);
 const sha256 = createHash("sha256").update(body).digest("hex");
 const bucket = process.env.BACKUP_BUCKET ?? process.env.S3_BUCKET;

@@ -40,6 +40,12 @@ export interface JobView {
   hardRejectReasons: string[];
   evidence: EvidenceView[];
   state: { saved: boolean; hidden: boolean; appliedAt: string | null };
+  refresh: {
+    eligible: boolean;
+    stale: boolean;
+    reason: string | null;
+    staleAt: string;
+  };
 }
 
 export interface JobsResponse {
