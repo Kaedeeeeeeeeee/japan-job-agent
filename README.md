@@ -70,3 +70,36 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent \
 Canonical merge rules are limited to normalized application URL, same-company posting/requisition identity, or a reviewed official-link Evidence. Title equality is never a merge rule, and `CanonicalService.unmerge()` preserves history and repairs both primary sources.
 
 The resume importer uses an allowlist: it derives normalized skill and experience signals, then combines them with `config/profile-policy.json`. It never copies resume text, names, email, phone, postal address, or URLs into the Profile. The original resume is not stored or uploaded. Deterministic match results are served from `/agent/jobs` with matched, gap, unknown, hard-reject reasons, and current Canonical Evidence IDs.
+
+## Ranking, private Web UI, and workflow state
+
+The deterministic ranking is fixed at 100 points: role 25, skills 25, language 15, recruitment channel 10, location/remote 10, employment 5, compensation 5, and freshness/source 5. Visa and unknown salary remain informational. Experience-year requirements are evidence-backed gaps, not hard filters.
+
+```bash
+# API and authenticated Web UI
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent PORT=3001 pnpm dev:api
+AUTH_BYPASS_LOCAL=true API_BASE_URL=http://127.0.0.1:3001 pnpm dev:web
+
+# Production build
+pnpm build:web
+```
+
+Production ignores `AUTH_BYPASS_LOCAL`; GitHub OAuth must resolve to `Kaedeeeeeeeeee`. Saved, hidden, and applied states are persisted through `/agent/jobs/:id/state`. Recommendations, score breakdowns, explanations, and the Canonical Version/Evidence inputs are versioned in PostgreSQL.
+
+## Temporal and operations
+
+```bash
+DATABASE_URL=... TEMPORAL_ADDRESS=127.0.0.1:7233 pnpm worker:start
+DATABASE_URL=... TEMPORAL_ADDRESS=127.0.0.1:7233 pnpm temporal:schedules
+DATABASE_URL=... TEMPORAL_ADDRESS=127.0.0.1:7233 pnpm temporal:refresh-source paypay
+
+DATABASE_URL=... pnpm backup:database
+RESTORE_DATABASE_URL=... BACKUP_INPUT_PATH=... pnpm backup:restore-verify
+DATABASE_URL=... pnpm acceptance:verify
+```
+
+Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. See the [Railway deployment runbook](./deploy/railway/README.md) and [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
+
+## Company seed audit
+
+`config/company-seeds.json` tracks all 16 requested companies. `pnpm source:seed-company-audits` persists verified official relationships and discovery states. Manual sources prove only the official company/recruiting relationship: they do not fabricate job records, enter recommendations, or participate in collection-missing closure.

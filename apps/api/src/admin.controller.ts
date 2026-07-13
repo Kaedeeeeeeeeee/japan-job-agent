@@ -122,6 +122,18 @@ export class AdminController {
     return (await this.database.query("SELECT * FROM evidence WHERE company_source_relationship_id = $1 ORDER BY created_at", [id])).rows;
   }
 
+  @Get("/review-tasks")
+  async reviewTasks() {
+    return (await this.database.query(`SELECT t.id,t.reason,t.detail,t.state,t.created_at,s.tenant_key,s.source_kind
+      FROM manual_review_tasks t LEFT JOIN source_instances s ON s.id=t.source_instance_id
+      ORDER BY (t.state='open') DESC,t.created_at DESC`)).rows;
+  }
+
+  @Get("/seed-audits")
+  async seedAudits() {
+    return (await this.database.query("SELECT * FROM company_seed_audits ORDER BY pool,company_name")).rows;
+  }
+
   @Get("/sync-runs/:id")
   async syncRun(@Param("id") syncRunId: string) {
     const id = z.string().uuid().parse(syncRunId);

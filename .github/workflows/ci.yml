@@ -39,7 +39,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm build:web
       - name: Migrate empty PostgreSQL 16 + pgvector database
         run: pnpm db:verify
       - run: pnpm test
-

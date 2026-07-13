@@ -1,0 +1,10 @@
+FROM node:24-bookworm-slim
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig*.json ./
+COPY apps/api ./apps/api
+COPY packages ./packages
+COPY scripts ./scripts
+RUN pnpm install --frozen-lockfile
+ENV NODE_ENV=production PORT=3000
+CMD ["pnpm", "exec", "tsx", "apps/api/src/main.ts"]

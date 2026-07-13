@@ -1,0 +1,15 @@
+FROM node:24-bookworm-slim AS build
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig*.json ./
+COPY apps/web ./apps/web
+RUN pnpm install --frozen-lockfile && pnpm build:web
+
+FROM node:24-bookworm-slim
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+WORKDIR /app
+COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/web ./apps/web
+ENV NODE_ENV=production PORT=3000
+CMD ["pnpm", "--filter", "@jja/web", "start"]
