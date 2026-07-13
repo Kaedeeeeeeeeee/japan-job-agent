@@ -58,3 +58,15 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm 
 ```
 
 The deterministic parser records `known`, `unknown`, and `conflicting` independently. A non-unknown employment, visa, location, language, skill, or compensation fact cannot be persisted without an Evidence row. schema.org fetches are HTTPS-only, revalidate each redirect target, block private/reserved addresses, and cap responses at 5 MB.
+
+## Canonical jobs and private Profile
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm canonical:materialize
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent \
+  RESUME_PATH=/absolute/path/to/resume_ja.html pnpm profile:import-safe
+```
+
+Canonical merge rules are limited to normalized application URL, same-company posting/requisition identity, or a reviewed official-link Evidence. Title equality is never a merge rule, and `CanonicalService.unmerge()` preserves history and repairs both primary sources.
+
+The resume importer uses an allowlist: it derives normalized skill and experience signals, then combines them with `config/profile-policy.json`. It never copies resume text, names, email, phone, postal address, or URLs into the Profile. The original resume is not stored or uploaded. Deterministic match results are served from `/agent/jobs` with matched, gap, unknown, hard-reject reasons, and current Canonical Evidence IDs.

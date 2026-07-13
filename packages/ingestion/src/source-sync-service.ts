@@ -5,6 +5,7 @@ import { calculateContentHashes } from "../../contracts/src/hashing.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
 import { collectSnapshot, finalizeSingleRecord, type SnapshotCircuitPolicy } from "../../domain/src/snapshot-orchestrator.js";
 import { LifecycleService } from "../../lifecycle/src/lifecycle-service.js";
+import { normalizeApplicationUrl } from "../../canonical/src/normalize-application-url.js";
 import type { RawObjectStore } from "../../storage/src/object-store.js";
 
 export interface SourceSyncRequest {
@@ -142,13 +143,14 @@ export class SourceSyncService {
     return this.db.transaction().execute(async (trx) => {
       const recordId = randomUUID();
       const insertedRecord = await sql<{ id: string; created: boolean }>`INSERT INTO source_job_records(
-          id, source_instance_id, stable_key, external_id, canonical_url, last_seen_at
+          id, source_instance_id, stable_key, external_id, canonical_url, normalized_application_url, last_seen_at
         ) VALUES (
           ${recordId}::uuid, ${job.identity.sourceInstanceId}::uuid, ${job.identity.stableKey},
-          ${job.identity.externalId ?? null}, ${job.identity.canonicalUrl}, now()
+          ${job.identity.externalId ?? null}, ${job.identity.canonicalUrl}, ${normalizeApplicationUrl(job.identity.canonicalUrl)}, now()
         ) ON CONFLICT (source_instance_id, stable_key) DO UPDATE SET
           external_id = EXCLUDED.external_id,
           canonical_url = EXCLUDED.canonical_url,
+          normalized_application_url = EXCLUDED.normalized_application_url,
           last_seen_at = now()
         RETURNING id, (xmax = 0) AS created`.execute(trx);
       const persistedRecordId = insertedRecord.rows[0]?.id;
