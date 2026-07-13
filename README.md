@@ -10,3 +10,21 @@
 - [Database schema](./japan-job-agent-spec-v0.1/schema-v0.1.sql)
 - [TypeScript contracts](./japan-job-agent-spec-v0.1/types-v0.1.ts)
 
+## v0.2 development
+
+```bash
+corepack enable
+pnpm install
+pnpm typecheck
+pnpm test
+```
+
+PostgreSQL 16 + pgvector の空データベースを検証する場合：
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm db:verify
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm test
+```
+
+- [v0.2 delta specification](./docs/spec/v0.2-foundation-delta.md)
+- [Architecture decisions](./docs/adr/README.md)
