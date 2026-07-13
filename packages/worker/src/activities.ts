@@ -30,6 +30,26 @@ export interface SourcePipelineResult {
   canonicalsMaterialized: number;
 }
 
+export interface FinalizeRefreshFailureInput {
+  refreshRequestId: string;
+  reason: string;
+}
+
+export async function finalizeRefreshFailureActivity(input: FinalizeRefreshFailureInput): Promise<void> {
+  const execution = activityInfo().workflowExecution;
+  if (execution === undefined) throw ApplicationFailure.nonRetryable("Workflow execution metadata is missing", "WORKFLOW_METADATA_MISSING");
+  const pool = new Pool({ connectionString: required("DATABASE_URL") });
+  const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool }) });
+  try {
+    await sql`UPDATE on_demand_refresh_requests SET status='failed',temporal_workflow_id=${execution.workflowId},
+      started_at=COALESCE(started_at,now()),completed_at=now(),failure_code='pipeline_terminal_failure',
+      failure_detail=${JSON.stringify({ message: input.reason.slice(0, 2_000) })}::jsonb
+      WHERE id=${input.refreshRequestId}::uuid AND status<>'succeeded'`.execute(db);
+  } finally {
+    await db.destroy();
+  }
+}
+
 export async function runSourcePipelineActivity(input: SourceSyncWorkflowInput): Promise<SourcePipelineResult> {
   const databaseUrl = required("DATABASE_URL");
   const info = activityInfo();
@@ -41,21 +61,41 @@ export async function runSourcePipelineActivity(input: SourceSyncWorkflowInput):
   try {
     const cached = await claimExecution(db, activityKey, execution.workflowId,
       execution.runId, info.activityId);
-    if (cached !== null) return cached;
+    if (cached !== null) {
+      if (input.refreshRequestId !== undefined) {
+        await markRefreshSucceeded(db, input.refreshRequestId, execution.workflowId);
+      }
+      return cached;
+    }
     try {
       const result = await runPipeline(db, input, execution.workflowId, execution.runId);
       await sql`UPDATE temporal_activity_executions SET status='succeeded',result=${JSON.stringify(result)}::jsonb,
         locked_at=NULL,lock_owner=NULL,updated_at=now() WHERE activity_key=${activityKey}`.execute(db);
+      if (input.refreshRequestId !== undefined) {
+        await markRefreshSucceeded(db, input.refreshRequestId, execution.workflowId);
+      }
       return result;
     } catch (error) {
       await sql`UPDATE temporal_activity_executions SET status='failed',result=${JSON.stringify({
         error: error instanceof Error ? error.message : String(error),
       })}::jsonb,locked_at=NULL,lock_owner=NULL,updated_at=now() WHERE activity_key=${activityKey}`.execute(db);
+      if (input.refreshRequestId !== undefined) {
+        await sql`UPDATE on_demand_refresh_requests SET status='retrying',temporal_workflow_id=${execution.workflowId},
+          started_at=COALESCE(started_at,now()),failure_code='pipeline_retry',failure_detail=${JSON.stringify({
+            message: error instanceof Error ? error.message : String(error),
+          })}::jsonb WHERE id=${input.refreshRequestId}::uuid AND status<>'succeeded'`.execute(db);
+      }
       throw error;
     }
   } finally {
     await db.destroy();
   }
+}
+
+async function markRefreshSucceeded(db: Kysely<OutboxDatabase>, requestId: string, workflowId: string): Promise<void> {
+  await sql`UPDATE on_demand_refresh_requests SET status='succeeded',temporal_workflow_id=${workflowId},
+    started_at=COALESCE(started_at,now()),completed_at=now(),failure_code=NULL,failure_detail=NULL
+    WHERE id=${requestId}::uuid`.execute(db);
 }
 
 async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflowInput,

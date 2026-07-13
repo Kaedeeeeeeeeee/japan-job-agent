@@ -153,6 +153,28 @@ integration("PostgreSQL foundation invariants", () => {
     expect(state.rows[0]).toEqual({ saved: true, applied: true });
     expect(extraction.recordId).toBeTruthy();
   });
+
+  it("deduplicates hourly on-demand refresh requests and enforces terminal audit state", async () => {
+    const extraction = await createExtraction(db);
+    const source = await sql<{ id: string }>`SELECT source_instance_id id FROM source_job_records
+      WHERE id=${extraction.recordId}::uuid`.execute(db);
+    const sourceId = source.rows[0]?.id;
+    expect(sourceId).toBeTruthy();
+    const canonicalJobId = randomUUID();
+    const requestKey = randomUUID().replaceAll("-", "").repeat(2);
+    await sql`INSERT INTO canonical_jobs(id) VALUES (${canonicalJobId}::uuid)`.execute(db);
+    await sql`INSERT INTO on_demand_refresh_requests(user_key,canonical_job_id,source_instance_id,request_key,status)
+      VALUES ('github:test',${canonicalJobId}::uuid,${sourceId}::uuid,${requestKey},'requested')`.execute(db);
+    await expect(sql`INSERT INTO on_demand_refresh_requests(user_key,canonical_job_id,source_instance_id,request_key,status)
+      VALUES ('github:test',${canonicalJobId}::uuid,${sourceId}::uuid,${requestKey},'requested')`.execute(db)).rejects.toThrow();
+    await expect(sql`UPDATE on_demand_refresh_requests SET status='succeeded',completed_at=now()
+      WHERE user_key='github:test' AND request_key=${requestKey}`.execute(db)).rejects.toThrow();
+    await sql`UPDATE on_demand_refresh_requests SET status='succeeded',temporal_workflow_id='refresh-test',completed_at=now()
+      WHERE user_key='github:test' AND request_key=${requestKey}`.execute(db);
+    const audit = await sql<{ status: string; completed: boolean }>`SELECT status,completed_at IS NOT NULL completed
+      FROM on_demand_refresh_requests WHERE user_key='github:test' AND request_key=${requestKey}`.execute(db);
+    expect(audit.rows[0]).toEqual({ status: "succeeded", completed: true });
+  });
 });
 
 async function createExtraction(db: Kysely<OutboxDatabase>): Promise<{ recordId: string; extractionId: string }> {
