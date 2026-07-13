@@ -43,3 +43,18 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm 
 ```
 
 Without S3 variables, raw objects are private local files under `.data/`. With `S3_BUCKET` and optional `S3_ENDPOINT`, the same command uses S3-compatible private storage. Source health and sync audits are available at `/admin/sources`, `/admin/sync-runs/:id`, and the minimal `/admin/review` page.
+
+## Deterministic extraction and schema.org
+
+```bash
+# Audits kubell and NEWONE official links and JobPosting JSON-LD.
+pnpm live:audit:schema
+
+# Persists both single records and immediately creates evidence-backed Extractions.
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm sync:schema
+
+# Replays the current parser over every pending Raw Version from a verified relationship.
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/japan_job_agent pnpm extract:pending
+```
+
+The deterministic parser records `known`, `unknown`, and `conflicting` independently. A non-unknown employment, visa, location, language, skill, or compensation fact cannot be persisted without an Evidence row. schema.org fetches are HTTPS-only, revalidate each redirect target, block private/reserved addresses, and cap responses at 5 MB.

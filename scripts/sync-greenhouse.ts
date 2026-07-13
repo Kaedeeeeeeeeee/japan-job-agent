@@ -1,11 +1,10 @@
-import { S3Client } from "@aws-sdk/client-s3";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { GreenhouseConnector } from "../packages/connectors-greenhouse/src/greenhouse-connector.js";
 import type { SourceInstanceRef } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
 import { SourceSyncService } from "../packages/ingestion/src/source-sync-service.js";
-import { FileRawObjectStore, S3RawObjectStore, type RawObjectStore } from "../packages/storage/src/object-store.js";
+import { createObjectStore } from "./object-store-config.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) throw new Error("DATABASE_URL is required");
@@ -47,14 +46,3 @@ try {
 } finally {
   await db.destroy();
 }
-
-function createObjectStore(): RawObjectStore {
-  const bucket = process.env.S3_BUCKET;
-  if (bucket === undefined) return new FileRawObjectStore(process.env.RAW_STORAGE_PATH ?? ".data");
-  const endpoint = process.env.S3_ENDPOINT;
-  return new S3RawObjectStore(new S3Client({
-    region: process.env.S3_REGION ?? "ap-southeast-1",
-    ...(endpoint === undefined ? {} : { endpoint, forcePathStyle: true }),
-  }), bucket);
-}
-

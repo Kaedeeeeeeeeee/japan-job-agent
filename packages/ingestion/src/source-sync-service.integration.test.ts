@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
-import type { SourceInstanceRef } from "../../contracts/src/index.js";
+import { ConnectorError, type CollectionPageRequest, type DiscoveredJob, type SourceConnector, type SourceInstanceRef, type SourceJobIdentity } from "../../contracts/src/index.js";
 import { GreenhouseConnector } from "../../connectors-greenhouse/src/greenhouse-connector.js";
+import { SchemaOrgConnector } from "../../connectors-schema-org/src/schema-org-connector.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
 import { MemoryRawObjectStore } from "../../storage/src/object-store.js";
 import { SourceSyncService } from "./source-sync-service.js";
@@ -58,5 +59,63 @@ integration("verified Greenhouse full sync", () => {
     expect(counts.rows[0]).toEqual({ records: "2", versions: "2", events: "2", runs: "10" });
     expect(store.objects.size).toBe(2);
   });
+
+  it("closes only the matching existing single record on HTTP 410", async () => {
+    const source: SourceInstanceRef = { id: randomUUID(), sourceKind: "schema_org", tenantKey: `gone-${randomUUID()}`, baseUrl: "https://example.com" };
+    const recordId = randomUUID();
+    await sql`INSERT INTO source_instances(id, source_kind, tenant_key, base_url, verification_state)
+      VALUES (${source.id}::uuid, 'schema_org', ${source.tenantKey}, ${source.baseUrl}, 'verified')`.execute(db);
+    await sql`INSERT INTO source_policies(source_instance_id, allows_authoritative_snapshot) VALUES (${source.id}::uuid, false)`.execute(db);
+    await sql`INSERT INTO source_job_records(id, source_instance_id, stable_key, canonical_url)
+      VALUES (${recordId}::uuid, ${source.id}::uuid, 'gone', 'https://example.com/gone')`.execute(db);
+    const connector = failingConnector("record_closed");
+    const result = await new SourceSyncService(db, connector, new MemoryRawObjectStore()).run({
+      source, idempotencyKey: `gone-${randomUUID()}`,
+      recordIdentity: { sourceInstanceId: source.id, stableKey: "gone", canonicalUrl: "https://example.com/gone" },
+    });
+    expect(result.snapshot?.kind).toBe("single_record");
+    const record = await sql<{ lifecycle_state: string }>`SELECT lifecycle_state FROM source_job_records WHERE id=${recordId}::uuid`.execute(db);
+    expect(record.rows[0]?.lifecycle_state).toBe("closed");
+  });
+
+  it("persists a successful schema.org source only as a single-record snapshot", async () => {
+    const source: SourceInstanceRef = { id: randomUUID(), sourceKind: "schema_org", tenantKey: `schema-${randomUUID()}`, baseUrl: "https://careers.example.com" };
+    await sql`INSERT INTO source_instances(id, source_kind, tenant_key, base_url, verification_state)
+      VALUES (${source.id}::uuid, 'schema_org', ${source.tenantKey}, ${source.baseUrl}, 'verified')`.execute(db);
+    await sql`INSERT INTO source_policies(source_instance_id, allows_authoritative_snapshot) VALUES (${source.id}::uuid, false)`.execute(db);
+    const url = "https://careers.example.com/jobs/27";
+    const html = `<script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", identifier: { value: "27" }, title: "Engineer", url })}</script>`;
+    const connector = new SchemaOrgConnector(async () => new Response(html, { status: 200, headers: { "content-type": "text/html" } }), async () => ["203.0.113.10"]);
+    const result = await new SourceSyncService(db, connector, new MemoryRawObjectStore()).run({
+      source, idempotencyKey: `schema-${randomUUID()}`,
+      recordIdentity: { sourceInstanceId: source.id, stableKey: "page", canonicalUrl: url },
+    });
+    expect(result).toMatchObject({ snapshot: { kind: "single_record" }, persistedRecords: 1, persistedVersions: 1 });
+    const count = await sql<{ count: string }>`SELECT count(*)::text AS count FROM source_job_records WHERE source_instance_id=${source.id}::uuid`.execute(db);
+    expect(count.rows[0]?.count).toBe("1");
+  });
+
+  it("finishes a forbidden single-record run as failed and only degrades source health", async () => {
+    const source: SourceInstanceRef = { id: randomUUID(), sourceKind: "schema_org", tenantKey: `forbidden-${randomUUID()}`, baseUrl: "https://example.com" };
+    await sql`INSERT INTO source_instances(id, source_kind, tenant_key, base_url, verification_state)
+      VALUES (${source.id}::uuid, 'schema_org', ${source.tenantKey}, ${source.baseUrl}, 'verified')`.execute(db);
+    await sql`INSERT INTO source_policies(source_instance_id, allows_authoritative_snapshot) VALUES (${source.id}::uuid, false)`.execute(db);
+    await expect(new SourceSyncService(db, failingConnector("forbidden"), new MemoryRawObjectStore()).run({
+      source, idempotencyKey: `forbidden-${randomUUID()}`,
+      recordIdentity: { sourceInstanceId: source.id, stableKey: "job", canonicalUrl: "https://example.com/job" },
+    })).rejects.toMatchObject({ code: "forbidden" });
+    const state = await sql<{ health_state: string; status: string }>`SELECT s.health_state, r.status FROM source_instances s
+      JOIN source_sync_runs r ON r.source_instance_id=s.id WHERE s.id=${source.id}::uuid`.execute(db);
+    expect(state.rows[0]).toEqual({ health_state: "degraded", status: "failed" });
+  });
 });
 
+function failingConnector(code: "record_closed" | "forbidden"): SourceConnector {
+  return {
+    kind: "schema_org",
+    async fetchCollectionPage(_request: CollectionPageRequest) { throw new Error("not used"); },
+    async fetchRecord(_identity: SourceJobIdentity): Promise<DiscoveredJob> {
+      throw new ConnectorError(code, code, false);
+    },
+  };
+}

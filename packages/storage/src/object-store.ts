@@ -1,9 +1,10 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 export interface RawObjectStore {
   putIfAbsent(key: string, bytes: Uint8Array, contentType: string | null): Promise<void>;
+  get(key: string): Promise<Uint8Array>;
 }
 
 export class S3RawObjectStore implements RawObjectStore {
@@ -29,6 +30,12 @@ export class S3RawObjectStore implements RawObjectStore {
       if (status !== 412) throw error;
     }
   }
+
+  async get(key: string): Promise<Uint8Array> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (response.Body === undefined) throw new Error(`S3 object ${key} has no body`);
+    return Uint8Array.from(await response.Body.transformToByteArray());
+  }
 }
 
 export class MemoryRawObjectStore implements RawObjectStore {
@@ -36,6 +43,13 @@ export class MemoryRawObjectStore implements RawObjectStore {
 
   async putIfAbsent(key: string, bytes: Uint8Array, _contentType: string | null): Promise<void> {
     if (!this.objects.has(key)) this.objects.set(key, bytes.slice());
+  }
+
+
+  async get(key: string): Promise<Uint8Array> {
+    const value = this.objects.get(key);
+    if (value === undefined) throw new Error(`Object ${key} does not exist`);
+    return value.slice();
   }
 }
 
@@ -52,5 +66,18 @@ export class FileRawObjectStore implements RawObjectStore {
     } catch (error) {
       if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
     }
+  }
+
+
+  async get(key: string): Promise<Uint8Array> {
+    const target = this.resolveKey(key);
+    return Uint8Array.from(await fs.readFile(target));
+  }
+
+  private resolveKey(key: string): string {
+    const target = path.resolve(this.rootDirectory, key);
+    const root = path.resolve(this.rootDirectory);
+    if (!target.startsWith(`${root}${path.sep}`)) throw new Error("Object key escaped storage root");
+    return target;
   }
 }
