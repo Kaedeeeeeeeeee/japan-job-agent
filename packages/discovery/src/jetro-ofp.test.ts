@@ -3,7 +3,7 @@ import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
-import { importJetroOfpPages, parseJetroOfpPage } from "./jetro-ofp.js";
+import { importJetroOfpPages, parseJetroOfpDetail, parseJetroOfpPage } from "./jetro-ofp.js";
 
 const fixture = `
 <input name="totalHit" value="2">
@@ -33,6 +33,23 @@ describe("JETRO OFP discovery", () => {
       industryLabels: ["EC・小売", "通信・情報・ソフトウェア"],
     });
     expect(JSON.stringify(page)).not.toMatch(/email|phone|contact/i);
+  });
+
+  it("parses only public company and recruiting links from a detail page", () => {
+    const detail = parseJetroOfpDetail(`<div class="hrportal_detail">
+      <div class="hrportal_company_title"><h1><span>高度外国人材関心企業</span>株式会社テスト</h1></div>
+      <div class="hrportal_company_point">高度外国人材の採用希望有 インターン受け入れ有 英語対応不可</div>
+      <div class="elem_text_list_term"><dl class="item"><dt>業種</dt><dd><ul><li>通信・情報・ソフトウェア</li></ul></dd></dl>
+      <dl class="item"><dt>所在地</dt><dd>東京都</dd></dl></div>
+      <a href="https://example.co.jp/">企業サイトを見る</a>
+      <a href="https://example.co.jp/recruit/">企業にコンタクトする</a>
+      <a href="tel:03-1234-5678">03-1234-5678</a></div>`,
+    "https://www.jetro.go.jp/hrportal/company/detail/123456.html", "2026-07-14T00:00:00.000Z");
+    expect(detail).toMatchObject({ externalKey: "123456", displayName: "株式会社テスト",
+      officialSiteUrl: "https://example.co.jp/", recruitmentUrl: "https://example.co.jp/recruit/",
+      industryLabels: ["通信・情報・ソフトウェア"], prefecture: "東京都", hiringInterest: true,
+      internshipAvailable: true, englishSupport: false });
+    expect(JSON.stringify(detail)).not.toContain("03-1234-5678");
   });
 });
 

@@ -60,4 +60,15 @@ describe("DeterministicJobParser", () => {
     expect(result.status).toBe("succeeded");
     expect(result.structured).toMatchObject({ title: "Web Engineer", employmentTypes: { state: "known" }, locations: { state: "known" } });
   });
+
+  it("falls back to a complete ATS detail HTML page without inventing absent facts", async () => {
+    const html = `<html><head><title>採用情報</title></head><body><main><h1>人事・採用担当</h1>
+      <section><h2>仕事内容</h2><p>採用計画、候補者対応、入社手続きを担当します。</p>
+      <h2>応募条件</h2><p>雇用形態：正社員。人事の実務経験3年以上。日本語N1。</p></section></main></body></html>`;
+    const result = await new DeterministicJobParser().parse(version(html), context);
+    expect(result.status).toBe("succeeded");
+    expect(result.structured).toMatchObject({ title: "人事・採用担当", employmentTypes: { state: "known" },
+      languages: { state: "known" }, visaSupport: { state: "unknown" } });
+    expect(result.structured.experienceRequirements).toMatchObject({ state: "known", values: [{ minimumYears: 3 }] });
+  });
 });

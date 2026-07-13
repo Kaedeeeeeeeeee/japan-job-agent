@@ -62,7 +62,7 @@ export interface ParsedJob extends Record<string, unknown> {
 
 export class DeterministicJobParser implements JobParser {
   readonly parserKey = "deterministic-job";
-  readonly parserVersion = "1.3.0";
+  readonly parserVersion = "1.4.0";
   readonly schemaVersion = "job-v1";
 
   async parse(version: SourceJobVersion, _context: ParserContext): Promise<ExtractionCandidate> {
@@ -121,7 +121,23 @@ function sourceDocument(raw: Uint8Array): SourceDocument {
     const job = JSON.parse(input) as Record<string, unknown>;
     return documentFromObject(job);
   }
-  return documentFromObject(findJobPosting(raw));
+  try {
+    return documentFromObject(findJobPosting(raw));
+  } catch {
+    return documentFromHtml(input);
+  }
+}
+
+function documentFromHtml(input: string): SourceDocument {
+  const $ = load(input);
+  $("script,style,noscript,nav,footer,header").remove();
+  const title = cleanHtmlText($("h1").first().text())
+    || cleanHtmlText($('meta[property="og:title"]').attr("content") ?? "")
+    || cleanHtmlText($("title").first().text());
+  const content = $("main").first().length > 0 ? $("main").first() : $("body").first();
+  const descriptionText = cleanHtmlText(content.text());
+  if (title === "" || descriptionText.length < 40) throw new Error("HTML job detail has insufficient title or body content");
+  return { title, descriptionText, searchText: `${title}\n${descriptionText}`, locationTexts: [], employmentTexts: [] };
 }
 
 function documentFromObject(job: Record<string, unknown>): SourceDocument {
@@ -146,6 +162,10 @@ function htmlText(html: string): string {
     $(element).append(" ");
   });
   return $("main").text().replace(/\s+/g, " ").trim();
+}
+
+function cleanHtmlText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function extractLocationTexts(job: Record<string, unknown>): string[] {

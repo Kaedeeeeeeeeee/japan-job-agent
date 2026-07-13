@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const sourceKindSchema = z.enum(["greenhouse", "schema_org", "manual", "hrmos"]);
+export const sourceKindSchema = z.enum(["greenhouse", "schema_org", "manual", "hrmos", "herp", "jobcan"]);
 export type SourceKind = z.infer<typeof sourceKindSchema>;
 
 export const sourceInstanceRefSchema = z.object({

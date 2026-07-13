@@ -73,6 +73,51 @@ export interface DiscoveryImportResult {
   replayed: boolean;
 }
 
+export interface JetroOfpCompanyDetail {
+  externalKey: string;
+  displayName: string;
+  detailUrl: string;
+  officialSiteUrl: string | null;
+  recruitmentUrl: string | null;
+  hiringInterest: boolean;
+  internshipAvailable: boolean;
+  englishSupport: boolean;
+  industryLabels: string[];
+  prefecture: string | null;
+  fetchedAt: string;
+}
+
+export function parseJetroOfpDetail(
+  html: string,
+  detailUrl: string,
+  fetchedAt: string,
+): JetroOfpCompanyDetail {
+  const $ = load(html);
+  const externalKey = new URL(detailUrl).pathname.match(/\/detail\/(\d+)\.html/)?.[1];
+  if (externalKey === undefined) throw new Error(`Invalid JETRO OFP detail URL: ${detailUrl}`);
+  const heading = cleanText($(".hrportal_company_title h1").first().text()).replace(/^高度外国人材関心企業\s*/, "");
+  if (heading === "") throw new Error(`JETRO OFP detail ${externalKey} has no company name`);
+  const officialSiteUrl = labeledExternalLink($, "企業サイトを見る");
+  const recruitmentUrl = labeledExternalLink($, "企業にコンタクトする");
+  const points = cleanText($(".hrportal_company_point").first().text());
+  const infoItems = $(".elem_text_list_term dl.item").toArray();
+  const industryItem = infoItems.find((item) => cleanText($(item).find("dt").text()) === "業種");
+  const prefectureItem = infoItems.find((item) => cleanText($(item).find("dt").text()) === "所在地");
+  return {
+    externalKey,
+    displayName: heading,
+    detailUrl,
+    officialSiteUrl,
+    recruitmentUrl,
+    hiringInterest: /採用希望有/.test(points),
+    internshipAvailable: /インターン\s*受け入れ有/.test(points),
+    englishSupport: !/英語対応不可/.test(points) && /英語/.test(points),
+    industryLabels: industryItem === undefined ? [] : $(industryItem).find("dd li").map((_i, item) => cleanText($(item).text())).get().filter(Boolean),
+    prefecture: prefectureItem === undefined ? null : cleanText($(prefectureItem).find("dd").text()) || null,
+    fetchedAt,
+  };
+}
+
 export async function importJetroOfpPages(
   db: Kysely<OutboxDatabase>,
   pages: readonly DiscoveryPage[],
@@ -169,4 +214,11 @@ function splitLabels(value: string): string[] {
 
 function cleanText(value: string): string {
   return value.replace(/[\s　]+/g, " ").trim();
+}
+
+function labeledExternalLink($: ReturnType<typeof load>, label: string): string | null {
+  const anchor = $("a[href]").toArray().find((element) => cleanText($(element).text()).includes(label));
+  const href = anchor === undefined ? undefined : $(anchor).attr("href");
+  if (href === undefined || !/^https?:\/\//.test(href)) return null;
+  return href;
 }

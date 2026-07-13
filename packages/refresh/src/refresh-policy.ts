@@ -31,7 +31,7 @@ export function evaluateRefreshPolicy(input: RefreshPolicyInput): RefreshPolicyR
   if (input.lifecycleState !== "active") return { ...base, eligible: false, reason: "job_inactive" };
   if (!input.saved && !input.applied) return { ...base, eligible: false, reason: "save_or_apply_required" };
   if (!input.sourceVerified) return { ...base, eligible: false, reason: "source_unverified" };
-  if (!input.staleRefreshAllowed || !["greenhouse", "schema_org"].includes(input.sourceKind)) {
+  if (!input.staleRefreshAllowed || !["greenhouse", "schema_org", "hrmos", "herp", "jobcan"].includes(input.sourceKind)) {
     return { ...base, eligible: false, reason: "source_not_refreshable" };
   }
   if (!stale) return { ...base, eligible: false, reason: "source_not_stale" };

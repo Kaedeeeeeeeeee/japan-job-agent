@@ -10,7 +10,7 @@ const companyInput = z.object({
   officialDomain: z.string().min(1),
 });
 const sourceInput = z.object({
-  sourceKind: z.enum(["greenhouse", "schema_org", "manual", "hrmos"]),
+  sourceKind: z.enum(["greenhouse", "schema_org", "manual", "hrmos", "herp", "jobcan"]),
   tenantKey: z.string().min(1),
   baseUrl: z.url(),
 });
