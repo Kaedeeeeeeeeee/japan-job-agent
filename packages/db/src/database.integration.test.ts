@@ -97,14 +97,18 @@ integration("PostgreSQL foundation invariants", () => {
       (${sourceId}::uuid, 'manual', ${`idem-${sourceId}`}, 'https://example.com')`.execute(db);
     await sql`INSERT INTO source_sync_runs(source_instance_id, idempotency_key) VALUES (${sourceId}::uuid, 'daily:2026-07-13')`.execute(db);
     await expect(sql`INSERT INTO source_sync_runs(source_instance_id, idempotency_key) VALUES (${sourceId}::uuid, 'daily:2026-07-13')`.execute(db)).rejects.toThrow();
+    const workflowId = randomUUID();
+    const runId = randomUUID();
+    const activityId = randomUUID();
     await sql`INSERT INTO temporal_activity_executions(activity_key, activity_type, temporal_workflow_id, temporal_run_id, temporal_activity_id, status)
-      VALUES ('key-1', 'persist-job', 'wf', 'run', 'activity', 'succeeded')`.execute(db);
+      VALUES (${`key-${randomUUID()}`}, 'persist-job', ${workflowId}, ${runId}, ${activityId}, 'succeeded')`.execute(db);
     await expect(sql`INSERT INTO temporal_activity_executions(activity_key, activity_type, temporal_workflow_id, temporal_run_id, temporal_activity_id, status)
-      VALUES ('key-2', 'persist-job', 'wf', 'run', 'activity', 'succeeded')`.execute(db)).rejects.toThrow();
+      VALUES (${`key-${randomUUID()}`}, 'persist-job', ${workflowId}, ${runId}, ${activityId}, 'succeeded')`.execute(db)).rejects.toThrow();
   });
 
   it("allows two publishers to claim an event only once and consumers to apply once", async () => {
     const eventId = randomUUID();
+    await sql`UPDATE outbox_events SET published_at = now() WHERE published_at IS NULL`.execute(db);
     await sql`INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, dedup_key)
       VALUES (${eventId}::uuid, 'source_job', ${randomUUID()}::uuid, 'job.observed', '{}'::jsonb, ${`event-${eventId}`})`.execute(db);
     const [a, b] = await Promise.all([
@@ -143,4 +147,3 @@ async function createEvidence(db: Kysely<OutboxDatabase>, extractionId: string, 
     VALUES (${id}::uuid, 'field_quote', ${extractionId}::uuid, 'fixture', ${quote}, 'https://example.com/job', '{"selector":"body"}'::jsonb)`.execute(db);
   return id;
 }
-
