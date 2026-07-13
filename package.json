@@ -34,7 +34,8 @@
     "temporal:refresh-source": "tsx scripts/start-source-workflow.ts",
     "backup:database": "tsx scripts/backup-database.ts",
     "backup:restore-verify": "tsx scripts/verify-backup-restore.ts",
-    "acceptance:verify": "tsx scripts/verify-final-acceptance.ts"
+    "acceptance:verify": "tsx scripts/verify-final-acceptance.ts",
+    "deploy:preflight": "tsx scripts/verify-production-config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
