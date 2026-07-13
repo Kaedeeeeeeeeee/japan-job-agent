@@ -13,7 +13,7 @@ describe("company seed audit contract", () => {
   });
   it("requires verified seeds to have a source URL and current jobs", () => {
     for (const seed of seeds.filter((value) => value.auditState === "verified")) {
-      expect(seed.sourceKind).toMatch(/greenhouse|schema_org|manual/);
+      expect(seed.sourceKind).toMatch(/greenhouse|schema_org|manual|hrmos/);
       expect(seed.sourceUrl).toMatch(/^https:\/\//);
       expect(seed.currentJobCount).toBeGreaterThan(0);
     }

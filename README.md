@@ -106,3 +106,14 @@ Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Acti
 ## Company seed audit
 
 `config/company-seeds.json` tracks all 16 requested companies. `pnpm source:seed-company-audits` persists verified official relationships and discovery states. Manual sources prove only the official company/recruiting relationship: they do not fabricate job records, enter recommendations, or participate in collection-missing closure.
+
+## 10,000-job source expansion
+
+Discovery directories are isolated from recommendation-eligible jobs. JETRO OFP entries create auditable company candidates and company-level foreign-talent signals; they cannot create job records or be promoted to job-level visa facts.
+
+```bash
+DATABASE_URL=... pnpm discovery:jetro-ofp
+DATABASE_URL=... pnpm sync:hrmos -- verified-tenant-key
+```
+
+HRMOS is a complete-collection connector: it fetches every detail body before the Orchestrator may finalize an authoritative snapshot. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md).

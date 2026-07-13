@@ -8,7 +8,7 @@ interface InputRow {
   structured_result: Record<string, unknown>;
   source_job_record_id: string;
   source_instance_id: string;
-  source_kind: "greenhouse" | "schema_org" | "manual";
+  source_kind: "greenhouse" | "schema_org" | "manual" | "hrmos";
   canonical_url: string;
   normalized_application_url: string | null;
   external_id: string | null;

@@ -22,6 +22,8 @@
     "source:seed-verified": "tsx scripts/seed-verified-greenhouse.ts",
     "source:seed-company-audits": "tsx scripts/seed-company-audits.ts",
     "sync:greenhouse": "tsx scripts/sync-greenhouse.ts",
+    "sync:hrmos": "tsx scripts/sync-hrmos.ts",
+    "discovery:jetro-ofp": "tsx scripts/import-jetro-ofp.ts",
     "sync:schema": "tsx scripts/sync-schema-org.ts",
     "extract:pending": "tsx scripts/extract-pending.ts",
     "canonical:materialize": "tsx scripts/materialize-canonical.ts",

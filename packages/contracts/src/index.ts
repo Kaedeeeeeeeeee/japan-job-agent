@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const sourceKindSchema = z.enum(["greenhouse", "schema_org", "manual"]);
+export const sourceKindSchema = z.enum(["greenhouse", "schema_org", "manual", "hrmos"]);
 export type SourceKind = z.infer<typeof sourceKindSchema>;
 
 export const sourceInstanceRefSchema = z.object({
@@ -125,6 +125,34 @@ export const sourceHealthSchema = z.object({
   detail: z.string().nullable(),
 });
 export type SourceHealth = z.infer<typeof sourceHealthSchema>;
+
+export const corpusPrioritySchema = z.enum(["p0", "p1", "p2", "p3"]);
+export type CorpusPriority = z.infer<typeof corpusPrioritySchema>;
+
+export const discoveryCandidateSchema = z.object({
+  externalKey: z.string().min(1),
+  displayName: z.string().min(1),
+  detailUrl: z.url(),
+  prefecture: z.string().min(1).nullable(),
+  industryLabels: z.array(z.string().min(1)),
+  desiredRoleLabels: z.array(z.string().min(1)),
+  priority: corpusPrioritySchema,
+  hiringInterest: z.boolean(),
+  internshipAvailable: z.boolean(),
+  englishSupport: z.boolean(),
+  evidenceQuote: z.string().min(1),
+});
+export type DiscoveryCandidate = z.infer<typeof discoveryCandidateSchema>;
+
+export const discoveryPageSchema = z.object({
+  candidates: z.array(discoveryCandidateSchema),
+  page: z.number().int().positive(),
+  nextPage: z.number().int().positive().nullable(),
+  providerTotal: z.number().int().nonnegative().optional(),
+  fetchedAt: z.iso.datetime(),
+  sourceUrl: z.url(),
+});
+export type DiscoveryPage = z.infer<typeof discoveryPageSchema>;
 
 export interface SourceJobVersion {
   id: string;

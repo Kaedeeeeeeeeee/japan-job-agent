@@ -4,6 +4,7 @@ import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { CanonicalService } from "../../canonical/src/canonical-service.js";
 import { GreenhouseConnector } from "../../connectors-greenhouse/src/greenhouse-connector.js";
+import { HrmosConnector } from "../../connectors-hrmos/src/hrmos-connector.js";
 import { SchemaOrgConnector } from "../../connectors-schema-org/src/schema-org-connector.js";
 import type { SourceInstanceRef } from "../../contracts/src/index.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
@@ -17,7 +18,7 @@ const { Pool } = pg;
 
 interface SourceRow {
   id: string;
-  source_kind: "greenhouse" | "schema_org" | "manual";
+  source_kind: "greenhouse" | "schema_org" | "manual" | "hrmos";
   tenant_key: string;
   base_url: string;
 }
@@ -109,8 +110,9 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
   const store = createObjectStore();
   const idempotencyKey = `temporal:${workflowId}:${runId}`;
   let snapshotKind = "reused";
-  if (row.source_kind === "greenhouse") {
-    const result = await new SourceSyncService(db, new GreenhouseConnector(), store).run({
+  if (row.source_kind === "greenhouse" || row.source_kind === "hrmos") {
+    const connector = row.source_kind === "greenhouse" ? new GreenhouseConnector() : new HrmosConnector();
+    const result = await new SourceSyncService(db, connector, store).run({
       source, idempotencyKey, temporalWorkflowId: workflowId, temporalRunId: runId,
     });
     snapshotKind = result.snapshot?.kind ?? "reused";
