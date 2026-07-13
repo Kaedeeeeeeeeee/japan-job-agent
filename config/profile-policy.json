@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "profile-v1",
+  "targetChannels": ["new_grad_2027", "junior_midcareer"],
+  "rolePriorities": [
+    { "group": "product_web_ai_engineering", "weight": 1 },
+    { "group": "ios_engineering", "weight": 0.7 },
+    { "group": "unity_game_engineering", "weight": 0.4 }
+  ],
+  "locations": {
+    "accepted": ["tokyo_metropolitan_area", "remote_within_japan"],
+    "hardConflictOnlyWhenExplicit": true
+  },
+  "employment": {
+    "preferred": ["permanent"],
+    "needsConfirmation": ["fixed_term"],
+    "excluded": ["dispatch", "ses_on_site", "independent_contractor", "part_time"]
+  },
+  "languages": [
+    { "code": "ja", "level": "JLPT N1" },
+    { "code": "zh", "level": "native" },
+    { "code": "en", "level": "TOEIC 680" }
+  ],
+  "visa": {
+    "currentStatus": "not_stored_in_repository",
+    "filterMode": "informational_only"
+  },
+  "compensation": {
+    "currency": "JPY",
+    "annualTarget": 4000000,
+    "mode": "soft",
+    "unknownIsEligible": true
+  }
+}
+

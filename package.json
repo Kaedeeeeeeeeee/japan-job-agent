@@ -23,6 +23,8 @@
     "sync:greenhouse": "tsx scripts/sync-greenhouse.ts",
     "sync:schema": "tsx scripts/sync-schema-org.ts",
     "extract:pending": "tsx scripts/extract-pending.ts",
+    "canonical:materialize": "tsx scripts/materialize-canonical.ts",
+    "profile:import-safe": "tsx scripts/import-safe-profile.ts",
     "dev:api": "tsx watch apps/api/src/main.ts"
   },
   "dependencies": {
