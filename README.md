@@ -98,9 +98,10 @@ DATABASE_URL=... TEMPORAL_ADDRESS=127.0.0.1:7233 pnpm temporal:refresh-source pa
 DATABASE_URL=... pnpm backup:database
 RESTORE_DATABASE_URL=... BACKUP_INPUT_PATH=... pnpm backup:restore-verify
 DATABASE_URL=... pnpm acceptance:verify
+pnpm deploy:preflight -- web
 ```
 
-Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. See the [Railway deployment runbook](./deploy/railway/README.md) and [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
+Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. Production preflight validates one of `api`, `web`, `worker`, `backup`, or `temporal` without printing values. See the [Railway deployment runbook](./deploy/railway/README.md) and [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
 
 ## Company seed audit
 
