@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+*.log
+.pnpm-store/
+.idea/
+.vscode/
+tmp/
+
