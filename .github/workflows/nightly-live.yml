@@ -27,6 +27,7 @@ jobs:
         if: always()
         with:
           name: greenhouse-live-audit
-          path: tmp/live-greenhouse-audit.json
+          path: |
+            tmp/live-greenhouse-audit.json
+            tmp/live-schema-org-audit.json
           retention-days: 30
-

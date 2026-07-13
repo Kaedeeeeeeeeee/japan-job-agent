@@ -101,6 +101,7 @@ export const connectorErrorCodeSchema = z.enum([
   "tenant_identity_mismatch",
   "total_mismatch",
   "ssrf_blocked",
+  "record_closed",
 ]);
 export type ConnectorErrorCode = z.infer<typeof connectorErrorCodeSchema>;
 
@@ -166,4 +167,3 @@ export type ExplicitState<T> =
   | { state: "known"; values: readonly T[]; evidenceIds: readonly string[] }
   | { state: "unknown"; values: readonly []; evidenceIds: readonly [] }
   | { state: "conflicting"; values: readonly T[]; evidenceIds: readonly string[] };
-

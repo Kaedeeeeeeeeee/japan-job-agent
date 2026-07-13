@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
-import type { FinalizedSnapshot, SourceConnector, SourceInstanceRef } from "../../contracts/src/index.js";
+import { ConnectorError, type FinalizedSnapshot, type SourceConnector, type SourceInstanceRef, type SourceJobIdentity } from "../../contracts/src/index.js";
 import { calculateContentHashes } from "../../contracts/src/hashing.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
-import { collectSnapshot, type SnapshotCircuitPolicy } from "../../domain/src/snapshot-orchestrator.js";
+import { collectSnapshot, finalizeSingleRecord, type SnapshotCircuitPolicy } from "../../domain/src/snapshot-orchestrator.js";
+import { LifecycleService } from "../../lifecycle/src/lifecycle-service.js";
 import type { RawObjectStore } from "../../storage/src/object-store.js";
 
 export interface SourceSyncRequest {
@@ -11,6 +12,7 @@ export interface SourceSyncRequest {
   idempotencyKey: string;
   temporalWorkflowId?: string;
   temporalRunId?: string;
+  recordIdentity?: SourceJobIdentity;
 }
 
 export interface SourceSyncResult {
@@ -66,19 +68,40 @@ export class SourceSyncService {
       sql<{ stable_key: string }>`SELECT stable_key FROM source_job_records
         WHERE source_instance_id = ${request.source.id}::uuid AND lifecycle_state = 'active'`.execute(this.db),
     ]);
-    let snapshot = await collectSnapshot(this.connector, {
-      source: request.source,
-      previousActiveStableKeys: new Set(previous.rows.map((row) => row.stable_key)),
-      policy,
-      now: () => new Date(),
-      signal,
-    });
+    let singleExact: Awaited<ReturnType<SourceConnector["fetchRecord"]>> | undefined;
+    let snapshot: FinalizedSnapshot;
+    if (request.recordIdentity !== undefined) {
+      try {
+        singleExact = await this.connector.fetchRecord(request.recordIdentity, signal);
+        snapshot = finalizeSingleRecord(request.source, singleExact, new Date());
+      } catch (error) {
+        if (error instanceof ConnectorError && error.code === "record_closed") {
+          const existing = await sql<{ id: string }>`SELECT id FROM source_job_records WHERE source_instance_id = ${request.source.id}::uuid
+            AND (stable_key = ${request.recordIdentity.stableKey} OR canonical_url = ${request.recordIdentity.canonicalUrl}) LIMIT 1`.execute(this.db);
+          const recordId = existing.rows[0]?.id;
+          if (recordId !== undefined) await new LifecycleService(this.db).closeSingleRecord(recordId, "http_410", new Date());
+          snapshot = emptySingleRecordSnapshot(request.source, error.message);
+          await this.finalizeRun(syncRunId, request.source.id, snapshot, 0);
+          return { syncRunId, snapshot, reused: false, persistedRecords: 0, persistedVersions: 0 };
+        }
+        await this.failRun(syncRunId, request.source.id, error);
+        throw error;
+      }
+    } else {
+      snapshot = await collectSnapshot(this.connector, {
+        source: request.source,
+        previousActiveStableKeys: new Set(previous.rows.map((row) => row.stable_key)),
+        policy,
+        now: () => new Date(),
+        signal,
+      });
+    }
 
     let persistedRecords = 0;
     let persistedVersions = 0;
     try {
       for (const discovered of snapshot.jobs) {
-        const exact = await this.connector.fetchRecord(discovered.identity, signal);
+        const exact = singleExact ?? await this.connector.fetchRecord(discovered.identity, signal);
         const result = await this.persistRecord(syncRunId, exact);
         persistedRecords += result.recordCreated ? 1 : 0;
         persistedVersions += result.versionCreated ? 1 : 0;
@@ -87,6 +110,7 @@ export class SourceSyncService {
       snapshot = downgradeSnapshot(snapshot, error);
     }
 
+    await new LifecycleService(this.db).reconcileSnapshot(request.source.id, syncRunId, snapshot, new Date());
     await this.finalizeRun(syncRunId, request.source.id, snapshot, persistedRecords);
     return { syncRunId, snapshot, reused: false, persistedRecords, persistedVersions };
   }
@@ -110,7 +134,9 @@ export class SourceSyncService {
     syncRunId: string,
     job: Awaited<ReturnType<SourceConnector["fetchRecord"]>>,
   ): Promise<{ recordCreated: boolean; versionCreated: boolean }> {
-    const hashes = calculateContentHashes(job.raw, stableJsonBytes, "json-stable-v1");
+    const jsonContent = job.response.contentType?.includes("json") === true;
+    const canonicalizationVersion = jsonContent ? "json-stable-v1" : "html-source-v1";
+    const hashes = calculateContentHashes(job.raw, jsonContent ? stableJsonBytes : stableHtmlBytes, canonicalizationVersion);
     const storageKey = `raw/sha256/${hashes.rawHash.slice(0, 2)}/${hashes.rawHash}`;
     await this.objectStore.putIfAbsent(storageKey, job.raw, job.response.contentType);
     return this.db.transaction().execute(async (trx) => {
@@ -123,11 +149,7 @@ export class SourceSyncService {
         ) ON CONFLICT (source_instance_id, stable_key) DO UPDATE SET
           external_id = EXCLUDED.external_id,
           canonical_url = EXCLUDED.canonical_url,
-          last_seen_at = now(),
-          lifecycle_state = 'active',
-          missing_count = 0,
-          last_authoritative_missing_at = NULL,
-          closed_at = NULL
+          last_seen_at = now()
         RETURNING id, (xmax = 0) AS created`.execute(trx);
       const persistedRecordId = insertedRecord.rows[0]?.id;
       if (persistedRecordId === undefined) throw new Error("failed to upsert source job record");
@@ -172,7 +194,9 @@ export class SourceSyncService {
         circuit_breaker_reason = ${snapshot.validation.circuitBreakerReasons}::text[], finished_at = now()
         WHERE id = ${syncRunId}::uuid`.execute(trx);
       await sql`UPDATE source_instances SET health_state = ${degraded ? "degraded" : "healthy"}::source_health_state,
-        last_success_at = now(), consecutive_failures = ${degraded ? 1 : 0}, updated_at = now()
+        last_success_at = CASE WHEN ${degraded} THEN last_success_at ELSE now() END,
+        last_failure_at = CASE WHEN ${degraded} THEN now() ELSE last_failure_at END,
+        consecutive_failures = CASE WHEN ${degraded} THEN consecutive_failures + 1 ELSE 0 END, updated_at = now()
         WHERE id = ${sourceInstanceId}::uuid`.execute(trx);
       if (snapshot.validation.circuitBreakerReasons.length > 0) {
         await sql`INSERT INTO manual_review_tasks(source_instance_id, source_sync_run_id, reason, detail)
@@ -181,11 +205,28 @@ export class SourceSyncService {
       }
     });
   }
+
+  private async failRun(syncRunId: string, sourceInstanceId: string, error: unknown): Promise<void> {
+    const code = error instanceof ConnectorError ? error.code : "unexpected";
+    const detail = error instanceof Error ? error.message : String(error);
+    await this.db.transaction().execute(async (trx) => {
+      await sql`UPDATE source_sync_runs SET status='failed', snapshot_kind='partial', finished_at=now(),
+        error_code=${code}, error_detail=${detail}, validation_result=${JSON.stringify({ error: detail })}::jsonb
+        WHERE id=${syncRunId}::uuid`.execute(trx);
+      await sql`UPDATE source_instances SET health_state='degraded', last_failure_at=now(),
+        consecutive_failures=consecutive_failures+1, updated_at=now() WHERE id=${sourceInstanceId}::uuid`.execute(trx);
+    });
+  }
 }
 
 function stableJsonBytes(bytes: Uint8Array): Uint8Array {
   const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
   return new TextEncoder().encode(stableJson(parsed));
+}
+
+function stableHtmlBytes(bytes: Uint8Array): Uint8Array {
+  const text = new TextDecoder().decode(bytes).replaceAll("\r\n", "\n").trim();
+  return new TextEncoder().encode(text);
 }
 
 function stableJson(value: unknown): string {
@@ -206,5 +247,13 @@ function downgradeSnapshot(snapshot: FinalizedSnapshot, error: unknown): Finaliz
       ...snapshot.validation,
       parseErrors: [...snapshot.validation.parseErrors, error instanceof Error ? error.message : String(error)],
     },
+  };
+}
+
+function emptySingleRecordSnapshot(source: SourceInstanceRef, note: string): FinalizedSnapshot {
+  return {
+    kind: "single_record", source, jobs: [], pageCount: 1, providerTotal: 0, finalizedAt: new Date().toISOString(),
+    validation: { allPagesCompleted: true, parseErrors: [note], tenantIdentityConsistent: true,
+      providerTotalMatched: true, circuitBreakerReasons: [] },
   };
 }

@@ -16,9 +16,13 @@
     "test:watch": "vitest",
     "db:migrate": "tsx packages/db/src/migrate.ts",
     "db:verify": "tsx packages/db/src/verify-migrations.ts",
-    "live:audit": "tsx scripts/audit-greenhouse-tenants.ts",
+    "live:audit": "pnpm live:audit:greenhouse && pnpm live:audit:schema",
+    "live:audit:greenhouse": "tsx scripts/audit-greenhouse-tenants.ts",
+    "live:audit:schema": "tsx scripts/audit-schema-org-jobs.ts",
     "source:seed-verified": "tsx scripts/seed-verified-greenhouse.ts",
     "sync:greenhouse": "tsx scripts/sync-greenhouse.ts",
+    "sync:schema": "tsx scripts/sync-schema-org.ts",
+    "extract:pending": "tsx scripts/extract-pending.ts",
     "dev:api": "tsx watch apps/api/src/main.ts"
   },
   "dependencies": {
@@ -26,6 +30,7 @@
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-fastify": "11.1.28",
+    "cheerio": "1.2.0",
     "fastify": "5.10.0",
     "kysely": "0.29.3",
     "pg": "8.22.0",

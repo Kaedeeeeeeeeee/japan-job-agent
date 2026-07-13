@@ -7,6 +7,6 @@ describe("raw object storage", () => {
     await store.putIfAbsent("raw/hash", new Uint8Array([1]), "application/json");
     await store.putIfAbsent("raw/hash", new Uint8Array([2]), "application/json");
     expect(store.objects.get("raw/hash")).toEqual(new Uint8Array([1]));
+    expect(await store.get("raw/hash")).toEqual(new Uint8Array([1]));
   });
 });
-
