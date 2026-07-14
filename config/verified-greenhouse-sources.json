@@ -4,21 +4,51 @@
     "officialDomain": "about.paypay.ne.jp",
     "officialCareerUrl": "https://about.paypay.ne.jp/career/",
     "tenantKey": "paypay",
-    "boardUrl": "https://boards.greenhouse.io/paypay"
+    "boardUrl": "https://boards.greenhouse.io/paypay",
+    "domesticBoard": true
   },
   {
     "companyName": "PayPayカード株式会社",
     "officialDomain": "www.paypay-card.co.jp",
     "officialCareerUrl": "https://www.paypay-card.co.jp/recruit/",
     "tenantKey": "paypaycard",
-    "boardUrl": "https://boards.greenhouse.io/paypaycard/"
+    "boardUrl": "https://boards.greenhouse.io/paypaycard/",
+    "domesticBoard": true
   },
   {
     "companyName": "PayPay証券株式会社",
     "officialDomain": "www.paypay-sec.co.jp",
     "officialCareerUrl": "https://www.paypay-sec.co.jp/corporate/recruit/",
     "tenantKey": "paypaysec",
-    "boardUrl": "https://boards.greenhouse.io/paypaysec/"
+    "boardUrl": "https://boards.greenhouse.io/paypaysec/",
+    "domesticBoard": true
+  },
+  {
+    "companyName": "Appier Group, Inc.",
+    "officialDomain": "www.appier.com",
+    "officialCareerUrl": "https://www.appier.com/ja-jp/about/career",
+    "tenantKey": "appier",
+    "boardUrl": "https://boards.greenhouse.io/appier"
+  },
+  {
+    "companyName": "KnowBe4, Inc.",
+    "officialDomain": "www.knowbe4.com",
+    "officialCareerUrl": "https://www.knowbe4.com/careers",
+    "tenantKey": "knowbe4",
+    "boardUrl": "https://boards-api.greenhouse.io/v1/boards/knowbe4/jobs"
+  },
+  {
+    "companyName": "MarqVision Inc.",
+    "officialDomain": "www.marqvision.com",
+    "officialCareerUrl": "https://www.marqvision.com/careers",
+    "tenantKey": "marqvision",
+    "boardUrl": "https://job-boards.greenhouse.io/marqvision"
+  },
+  {
+    "companyName": "Glance",
+    "officialDomain": "glance.com",
+    "officialCareerUrl": "https://glance.com/careers",
+    "tenantKey": "glance",
+    "boardUrl": "https://job-boards.greenhouse.io/glance"
   }
 ]
-

@@ -24,7 +24,7 @@ describe("restricted on-demand refresh policy", () => {
     });
   });
 
-  it.each(["hrmos", "herp", "jobcan"])("allows stale refreshes for %s sources", (sourceKind) => {
+  it.each(["hrmos", "herp", "jobcan", "airwork", "engage", "talentio"])("allows stale refreshes for %s sources", (sourceKind) => {
     expect(evaluateRefreshPolicy({ ...baseline, sourceKind }).eligible).toBe(true);
   });
 

@@ -1,21 +1,21 @@
 {
-  "generatedAt": "2026-07-13T15:36:07.436Z",
+  "generatedAt": "2026-07-13T23:46:19.893Z",
   "auditKey": "jetro-promotion:2026-07-14",
   "totalCompanies": 374,
   "linkedCompanies": 374,
   "statusCounts": {
-    "insecure_source": 75,
+    "insecure_source": 69,
     "verified_no_current_job": 59,
-    "unstructured_career_page": 176,
+    "unstructured_career_page": 179,
+    "promoted_active": 30,
     "unreachable": 33,
-    "promoted_active": 10,
-    "unsupported_source": 21
+    "unsupported_source": 4
   },
   "sourceCounts": [
     {
       "source_kind": "schema_org",
-      "sources": 2,
-      "jobs": 2
+      "sources": 1,
+      "jobs": 1
     },
     {
       "source_kind": "hrmos",
@@ -31,6 +31,21 @@
       "source_kind": "jobcan",
       "sources": 1,
       "jobs": 5
+    },
+    {
+      "source_kind": "airwork",
+      "sources": 10,
+      "jobs": 60
+    },
+    {
+      "source_kind": "engage",
+      "sources": 10,
+      "jobs": 56
+    },
+    {
+      "source_kind": "talentio",
+      "sources": 2,
+      "jobs": 16
     }
   ],
   "companies": [
@@ -72,8 +87,8 @@
     {
       "externalKey": "100017",
       "displayName": "株式会社ブートコミュニケーション",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 1,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/2025-bootcommunication",
@@ -380,8 +395,8 @@
     {
       "externalKey": "100186",
       "displayName": "アルチテック株式会社",
-      "status": "promoted_active",
-      "currentJobCount": 1,
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
       "detectedSources": [
         {
           "url": "https://artitech.co.jp/recruit/internship/",
@@ -562,8 +577,8 @@
     {
       "externalKey": "100285",
       "displayName": "堀内商事株式会社",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 7,
       "detectedSources": [
         {
           "url": "https://en-gage.net/horiuchi-shoji_saiyo/",
@@ -590,8 +605,8 @@
     {
       "externalKey": "100299",
       "displayName": "カネイシ株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 11,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/trzles3980jv3bt",
@@ -646,7 +661,7 @@
     {
       "externalKey": "100329",
       "displayName": "遠赤青汁株式会社",
-      "status": "unsupported_source",
+      "status": "unstructured_career_page",
       "currentJobCount": 0,
       "detectedSources": [
         {
@@ -772,8 +787,8 @@
     {
       "externalKey": "100368",
       "displayName": "株式会社サンウェル",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 15,
       "detectedSources": [
         {
           "url": "https://en-gage.net/sunwells_saiyo/",
@@ -782,7 +797,7 @@
           "collection": true
         },
         {
-          "url": "https://open.talentio.com/r/1/c/sunwells",
+          "url": "https://open.talentio.com/r/1/c/sunwells/homes/2052",
           "kind": "talentio",
           "tenantKey": "sunwells",
           "collection": true
@@ -848,8 +863,8 @@
     {
       "externalKey": "100384",
       "displayName": "ＫＪケミカルズ株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 8,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/ccdpimzmkpbt3fa",
@@ -876,8 +891,8 @@
     {
       "externalKey": "100392",
       "displayName": "株式会社櫻製作所",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 4,
       "detectedSources": [
         {
           "url": "https://en-gage.net/sakuraseisakusho/",
@@ -1135,8 +1150,8 @@
     {
       "externalKey": "100487",
       "displayName": "グリーンツール株式会社",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 8,
       "detectedSources": [
         {
           "url": "https://en-gage.net/greentool_saiyo/",
@@ -1184,8 +1199,8 @@
     {
       "externalKey": "100501",
       "displayName": "高砂電気工業株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 1,
       "detectedSources": [
         {
           "url": "https://en-gage.net/takasago-electric/",
@@ -1302,8 +1317,8 @@
     {
       "externalKey": "100530",
       "displayName": "株式会社トランスビジョン",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 16,
       "detectedSources": [
         {
           "url": "https://en-gage.net/transvision/",
@@ -1372,15 +1387,9 @@
     {
       "externalKey": "100541",
       "displayName": "株式会社アサイン",
-      "status": "unsupported_source",
+      "status": "unstructured_career_page",
       "currentJobCount": 0,
       "detectedSources": [
-        {
-          "url": "https://arwrk.net/recruit/fyq3ekiq9zrdt0q",
-          "kind": "airwork",
-          "tenantKey": "fyq3ekiq9zrdt0q",
-          "collection": true
-        },
         {
           "url": "https://arwrk.net/recruit/fyq3ekiq9zrdt0q/6660678/",
           "kind": "airwork",
@@ -1413,8 +1422,8 @@
     {
       "externalKey": "100551",
       "displayName": "トウショク株式会社",
-      "status": "insecure_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 10,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/egjemqcd608hba2",
@@ -1490,8 +1499,8 @@
     {
       "externalKey": "100570",
       "displayName": "株式会社中央電機計器製作所",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 3,
       "detectedSources": [
         {
           "url": "https://en-gage.net/cew/",
@@ -1539,8 +1548,8 @@
     {
       "externalKey": "100580",
       "displayName": "株式会社島川製作所",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 2,
       "detectedSources": [
         {
           "url": "https://en-gage.net/shimakawa-ss/",
@@ -1630,8 +1639,8 @@
     {
       "externalKey": "101124",
       "displayName": "赤田工業株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 4,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/wqzopwudrmvlzxb",
@@ -1735,8 +1744,8 @@
     {
       "externalKey": "101416",
       "displayName": "株式会社ヴァイオス",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 1,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/c0gvukag5g62nzn",
@@ -1812,11 +1821,11 @@
     {
       "externalKey": "101878",
       "displayName": "アンカーテクノロジーズ株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 4,
       "detectedSources": [
         {
-          "url": "https://open.talentio.com/r/1/c/anchor-u",
+          "url": "https://open.talentio.com/r/1/c/anchor-u/homes/4042",
           "kind": "talentio",
           "tenantKey": "anchor-u",
           "collection": true
@@ -2253,8 +2262,8 @@
     {
       "externalKey": "104056",
       "displayName": "株式会社ツノダ",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 6,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/pm9pqz23m5ghvos",
@@ -2498,8 +2507,8 @@
     {
       "externalKey": "105673",
       "displayName": "株式会社アイ・エス・エス",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 12,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/yslbllxn0mvu6gt",
@@ -2610,8 +2619,8 @@
     {
       "externalKey": "106102",
       "displayName": "双信電機株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 3,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/fotrfbfgzjfbwrw",
@@ -2624,8 +2633,8 @@
     {
       "externalKey": "106168",
       "displayName": "Ｐｏｌａｒ Ｆｏｘ株式会社",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 9,
       "detectedSources": [
         {
           "url": "https://en-gage.net/polarfox_career/",
@@ -2771,8 +2780,8 @@
     {
       "externalKey": "107356",
       "displayName": "株式会社タカギ",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 4,
       "detectedSources": [
         {
           "url": "https://arwrk.net/recruit/takagi-innerwear",
@@ -2855,8 +2864,8 @@
     {
       "externalKey": "107888",
       "displayName": "株式会社アナテック・ヤナコ",
-      "status": "unsupported_source",
-      "currentJobCount": 0,
+      "status": "promoted_active",
+      "currentJobCount": 3,
       "detectedSources": [
         {
           "url": "https://en-gage.net/yanaco_career/",

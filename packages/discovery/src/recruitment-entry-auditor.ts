@@ -109,8 +109,10 @@ export function detectSource(value: string): DetectedRecruitmentSource | null {
   if (host === "herp.careers" && (match = url.pathname.match(/^\/v1\/([^/]+)/)) !== null) {
     return { kind: "herp", tenantKey: match[1] ?? "", url: `https://herp.careers/v1/${match[1]}`, collection: true };
   }
-  if (host === "open.talentio.com" && (match = url.pathname.match(/^\/r\/\d+\/c\/([^/]+)/)) !== null) {
-    return { kind: "talentio", tenantKey: match[1] ?? "", url: `https://open.talentio.com/r/1/c/${match[1]}`, collection: true };
+  if (host === "open.talentio.com" && (match = url.pathname.match(/^\/r\/\d+\/c\/([^/]+)(?:\/homes\/\d+)?/)) !== null) {
+    const home = url.pathname.match(/^\/r\/\d+\/c\/[^/]+\/homes\/\d+/)?.[0];
+    return { kind: "talentio", tenantKey: match[1] ?? "", url: home === undefined
+      ? `https://open.talentio.com/r/1/c/${match[1]}` : `https://open.talentio.com${home}`, collection: true };
   }
   if (host === "jobs.smartrecruiters.com" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
     return { kind: "smartrecruiters", tenantKey: match[1] ?? "", url: `https://jobs.smartrecruiters.com/${match[1]}`, collection: true };
@@ -122,7 +124,7 @@ export function detectSource(value: string): DetectedRecruitmentSource | null {
     return { kind: "jobcan", tenantKey: match[1] ?? "", url: `https://recruit.jobcan.jp/${match[1]}`, collection: true };
   }
   if (host === "arwrk.net" && (match = url.pathname.match(/^\/recruit\/([^/]+)/)) !== null) {
-    return { kind: "airwork", tenantKey: match[1] ?? "", url: url.toString(), collection: true };
+    return { kind: "airwork", tenantKey: match[1] ?? "", url: `https://arwrk.net/recruit/${match[1]}`, collection: true };
   }
   if (host === "en-gage.net" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
     return { kind: "engage", tenantKey: match[1] ?? "", url: `https://en-gage.net/${match[1]}/`, collection: true };

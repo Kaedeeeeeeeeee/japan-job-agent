@@ -61,6 +61,15 @@ describe("DeterministicJobParser", () => {
     expect(result.structured).toMatchObject({ title: "Web Engineer", employmentTypes: { state: "known" }, locations: { state: "known" } });
   });
 
+  it("preserves explicit non-Japan country evidence for hard location filtering", async () => {
+    const result = await new DeterministicJobParser().parse(version(JSON.stringify({
+      title: "Backend Engineer", location: { name: "Taipei, Taiwan" }, content: "<p>Full-time backend engineering role.</p>",
+    })), context);
+    expect(result.status).toBe("succeeded");
+    expect(result.structured.locations).toMatchObject({ state: "known", values: [{ countryCode: "TW" }] });
+    expect(result.evidence.some((item) => item.fieldPath === "locations")).toBe(true);
+  });
+
   it("falls back to a complete ATS detail HTML page without inventing absent facts", async () => {
     const html = `<html><head><title>採用情報</title></head><body><main><h1>人事・採用担当</h1>
       <section><h2>仕事内容</h2><p>採用計画、候補者対応、入社手続きを担当します。</p>
@@ -70,5 +79,19 @@ describe("DeterministicJobParser", () => {
     expect(result.structured).toMatchObject({ title: "人事・採用担当", employmentTypes: { state: "known" },
       languages: { state: "known" }, visaSupport: { state: "unknown" } });
     expect(result.structured.experienceRequirements).toMatchObject({ state: "known", values: [{ minimumYears: 3 }] });
+  });
+
+  it("parses Talentio detail props when the visible body is client-rendered", async () => {
+    const props = JSON.stringify({ recruitmentOpenPage: { name: "Process Engineer", requisitionDetails: [
+      { name: "Qualifications", value: "At least 5 years of experience. English business level. Japanese N2 or above." },
+      { name: "Salary", value: "￥400K- ￥540K/Month" },
+      { name: "Location", value: ["東京都江東区"] },
+      { name: "Employment", value: "正社員" },
+    ], jobDescriptionDetails: [] } });
+    const result = await new DeterministicJobParser().parse(version(
+      `<html><head><title>Process Engineer</title></head><body><div data-react-props='${props.replaceAll("'", "&#39;")}'></div></body></html>`), context);
+    expect(result.status).toBe("succeeded");
+    expect(result.structured).toMatchObject({ title: "Process Engineer", employmentTypes: { state: "known" },
+      locations: { state: "known" }, languages: { state: "known" }, compensation: { state: "known" } });
   });
 });

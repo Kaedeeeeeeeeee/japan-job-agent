@@ -6,7 +6,7 @@ import pg from "pg";
 interface Seed {
   key: string; name: string; pool: "direct" | "watch"; officialDomain: string;
   auditState: "discovery" | "verified" | "no_current_job" | "blocked";
-  sourceKind?: "greenhouse" | "schema_org" | "manual" | "hrmos" | "herp" | "jobcan"; tenantKey?: string; sourceUrl?: string;
+  sourceKind?: "greenhouse" | "schema_org" | "manual" | "hrmos" | "herp" | "jobcan" | "airwork" | "engage" | "talentio"; tenantKey?: string; sourceUrl?: string;
   currentJobCount?: number; evidenceQuote?: string; notes?: string;
 }
 

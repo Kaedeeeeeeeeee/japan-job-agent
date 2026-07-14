@@ -118,7 +118,8 @@ pnpm discovery:audit-entrypoints
 pnpm discovery:audit-candidates
 DATABASE_URL=... pnpm discovery:promote
 DATABASE_URL=... pnpm discovery:report
+DATABASE_URL=... pnpm corpus:report
 DATABASE_URL=... pnpm sync:hrmos -- verified-tenant-key
 ```
 
-HRMOS, HERP, and Jobcan are complete-collection connectors: they fetch every detail body before the Orchestrator may finalize an authoritative snapshot. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md) and [2026-07-14 promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md).
+HRMOS, HERP, Jobcan, AirWork, engage, and Talentio are complete-collection connectors: they fetch every detail body before the Orchestrator may finalize an authoritative snapshot. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. Global Greenhouse boards retain complete snapshots while explicit overseas locations are deterministically excluded from recommendations. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md), [JETRO promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md), and [expanded corpus report](./docs/delivery/job-corpus-expansion-2026-07-14.md).

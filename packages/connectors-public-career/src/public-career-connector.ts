@@ -2,7 +2,7 @@ import { load } from "cheerio";
 import type { CollectionPage, CollectionPageRequest, DiscoveredJob, ResponseMetadata, SourceConnector, SourceJobIdentity } from "../../contracts/src/index.js";
 import { ConnectorError } from "../../contracts/src/index.js";
 
-type PublicCareerKind = "herp" | "jobcan";
+export type PublicCareerKind = "herp" | "jobcan" | "airwork" | "engage" | "talentio";
 interface IndexedRecord { externalId: string; url: string }
 
 export class PublicCareerConnector implements SourceConnector {
@@ -78,19 +78,28 @@ export class PublicCareerConnector implements SourceConnector {
 }
 
 export function parseRecords(kind: PublicCareerKind, bytes: Uint8Array, tenantKey: string): IndexedRecord[] {
-  const $ = load(new TextDecoder().decode(bytes));
+  const input = new TextDecoder().decode(bytes);
+  const $ = load(input);
   const records = new Map<string, IndexedRecord>();
   $("a[href]").each((_index, element) => {
     const href = $(element).attr("href");
     if (href === undefined) return;
-    const base = kind === "herp" ? "https://herp.careers" : "https://recruit.jobcan.jp";
+    const base = platformOrigin(kind);
     const url = new URL(href, base);
-    const pattern = kind === "herp"
-      ? new RegExp(`^/v1/${escapeRegExp(tenantKey)}/([^/]+)$`)
-      : new RegExp(`^/${escapeRegExp(tenantKey)}/job_offers/(\\d+)`);
+    const pattern = recordPattern(kind, tenantKey);
     const externalId = url.pathname.match(pattern)?.[1];
     if (externalId !== undefined) records.set(externalId, { externalId, url: `${url.origin}${url.pathname}` });
   });
+  if (kind === "talentio") {
+    const decoded = input.replaceAll("&quot;", '"').replaceAll("&amp;", "&");
+    const pattern = new RegExp(`https://open\\.talentio\\.com/r/1/c/${escapeRegExp(tenantKey)}/pages/(\\d+)`, "g");
+    for (const match of decoded.matchAll(pattern)) {
+      const externalId = match[1];
+      if (externalId !== undefined) records.set(externalId, {
+        externalId, url: `https://open.talentio.com/r/1/c/${tenantKey}/pages/${externalId}`,
+      });
+    }
+  }
   return [...records.values()];
 }
 
@@ -110,10 +119,27 @@ function toDiscoveredJob(sourceInstanceId: string, record: IndexedRecord, raw: U
 }
 
 function assertAllowedHost(kind: PublicCareerKind, url: URL): void {
-  const expected = kind === "herp" ? "herp.careers" : "recruit.jobcan.jp";
+  const expected = new URL(platformOrigin(kind)).hostname;
   if (url.protocol !== "https:" || url.hostname !== expected || url.username !== "" || url.password !== "") {
     throw new ConnectorError("ssrf_blocked", `${kind} connector only permits https://${expected}`, false);
   }
+}
+
+function platformOrigin(kind: PublicCareerKind): string {
+  if (kind === "herp") return "https://herp.careers";
+  if (kind === "jobcan") return "https://recruit.jobcan.jp";
+  if (kind === "airwork") return "https://arwrk.net";
+  if (kind === "engage") return "https://en-gage.net";
+  return "https://open.talentio.com";
+}
+
+function recordPattern(kind: PublicCareerKind, tenantKey: string): RegExp {
+  const tenant = escapeRegExp(tenantKey);
+  if (kind === "herp") return new RegExp(`^/v1/${tenant}/([^/]+)$`);
+  if (kind === "jobcan") return new RegExp(`^/${tenant}/job_offers/(\\d+)`);
+  if (kind === "airwork") return new RegExp(`^/recruit/${tenant}/(\\d+)/?$`);
+  if (kind === "engage") return new RegExp(`^/${tenant}/work_(\\d+)/?$`);
+  return new RegExp(`^/r/1/c/${tenant}/pages/(\\d+)/?$`);
 }
 
 function responseError(kind: PublicCareerKind, status: number, url: URL): ConnectorError {

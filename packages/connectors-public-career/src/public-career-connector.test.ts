@@ -9,6 +9,33 @@ describe("public career connectors", () => {
       .toEqual([{ externalId: "job-a", url: "https://herp.careers/v1/acme/job-a" }]);
     expect(parseRecords("jobcan", bytes('<a href="/acme/job_offers/42?hide=false">A</a>'), "acme"))
       .toEqual([{ externalId: "42", url: "https://recruit.jobcan.jp/acme/job_offers/42" }]);
+    expect(parseRecords("airwork", bytes('<a href="/recruit/acme/123/">A</a><a href="/recruit/acme/policy/">No</a>'), "acme"))
+      .toEqual([{ externalId: "123", url: "https://arwrk.net/recruit/acme/123/" }]);
+    expect(parseRecords("engage", bytes('<a href="/acme/work_456/?via=1">A</a>'), "acme"))
+      .toEqual([{ externalId: "456", url: "https://en-gage.net/acme/work_456/" }]);
+    expect(parseRecords("talentio", bytes('<div data-props="{&quot;publishedUrl&quot;:&quot;https://open.talentio.com/r/1/c/acme/pages/789&quot;}"></div>'), "acme"))
+      .toEqual([{ externalId: "789", url: "https://open.talentio.com/r/1/c/acme/pages/789" }]);
+  });
+
+  it.each([
+    ["airwork", "https://arwrk.net/recruit/acme", '<a href="/recruit/acme/123/">A</a>', "/123/"],
+    ["engage", "https://en-gage.net/acme/", '<a href="/acme/work_456/">A</a>', "work_456/"],
+    ["talentio", "https://open.talentio.com/r/1/c/acme/homes/1", '<a href="/r/1/c/acme/pages/789">A</a>', "/789"],
+  ] as const)("only finalizes a complete %s collection after detail fetches", async (kind, baseUrl, listing, detailSuffix) => {
+    let details = 0;
+    const connector = new PublicCareerConnector(kind, async (input) => {
+      if (String(input).endsWith(detailSuffix)) {
+        details += 1;
+        return response("<html><h1>Engineer</h1><main>Current official role with enough deterministic detail text for parsing.</main></html>");
+      }
+      return response(listing);
+    });
+    const source: SourceInstanceRef = { id: "11111111-1111-4111-8111-111111111111", sourceKind: kind, tenantKey: "acme", baseUrl };
+    const snapshot = await collectSnapshot(connector, { source, previousActiveStableKeys: new Set(),
+      policy: { allowsAuthoritativeSnapshot: true, minimumPreviousActive: 5, maximumMissingRatio: 0.5, maximumMissingAbsolute: 25 },
+      now: () => new Date("2026-07-14T00:00:00Z"), signal: AbortSignal.timeout(1_000) });
+    expect(snapshot).toMatchObject({ kind: "authoritative", providerTotal: 1 });
+    expect(details).toBe(1);
   });
 
   it("only finalizes HERP after exact detail bodies are fetched", async () => {

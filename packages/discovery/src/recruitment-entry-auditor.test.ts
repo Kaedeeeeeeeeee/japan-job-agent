@@ -8,6 +8,13 @@ describe("recruitment entrypoint audit", () => {
     expect(detectSource("https://public.n-ats.hrmos.co/acme/jobs/123")).toMatchObject({ kind: "schema_org", collection: false });
     expect(detectSource("https://herp.careers/v1/acme/abc")).toMatchObject({ kind: "herp", tenantKey: "acme" });
     expect(detectSource("https://recruit.jobcan.jp/acme/job_offers/42")).toMatchObject({ kind: "jobcan", tenantKey: "acme" });
+    expect(detectSource("https://arwrk.net/recruit/acme/123/")).toMatchObject({
+      kind: "airwork", tenantKey: "acme", url: "https://arwrk.net/recruit/acme",
+    });
+    expect(detectSource("https://en-gage.net/acme/work_42/")).toMatchObject({ kind: "engage", tenantKey: "acme" });
+    expect(detectSource("https://open.talentio.com/r/1/c/acme/homes/4042")).toMatchObject({
+      kind: "talentio", tenantKey: "acme", url: "https://open.talentio.com/r/1/c/acme/homes/4042",
+    });
     expect(detectSource("https://example.com/recruit")).toBeNull();
   });
 

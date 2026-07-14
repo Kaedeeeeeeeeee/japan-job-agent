@@ -62,7 +62,7 @@ export interface ParsedJob extends Record<string, unknown> {
 
 export class DeterministicJobParser implements JobParser {
   readonly parserKey = "deterministic-job";
-  readonly parserVersion = "1.4.0";
+  readonly parserVersion = "1.6.0";
   readonly schemaVersion = "job-v1";
 
   async parse(version: SourceJobVersion, _context: ParserContext): Promise<ExtractionCandidate> {
@@ -130,6 +130,15 @@ function sourceDocument(raw: Uint8Array): SourceDocument {
 
 function documentFromHtml(input: string): SourceDocument {
   const $ = load(input);
+  const talentio = $("[data-react-props]").first().attr("data-react-props");
+  if (talentio !== undefined) {
+    try {
+      const document = documentFromTalentio(JSON.parse(talentio) as unknown);
+      if (document !== null) return document;
+    } catch {
+      // Continue with visible server-rendered HTML when embedded props change shape.
+    }
+  }
   $("script,style,noscript,nav,footer,header").remove();
   const title = cleanHtmlText($("h1").first().text())
     || cleanHtmlText($('meta[property="og:title"]').attr("content") ?? "")
@@ -138,6 +147,32 @@ function documentFromHtml(input: string): SourceDocument {
   const descriptionText = cleanHtmlText(content.text());
   if (title === "" || descriptionText.length < 40) throw new Error("HTML job detail has insufficient title or body content");
   return { title, descriptionText, searchText: `${title}\n${descriptionText}`, locationTexts: [], employmentTexts: [] };
+}
+
+function documentFromTalentio(value: unknown): SourceDocument | null {
+  if (value === null || typeof value !== "object" || !("recruitmentOpenPage" in value)) return null;
+  const page = value.recruitmentOpenPage;
+  if (page === null || typeof page !== "object") return null;
+  const title = "name" in page && typeof page.name === "string" ? cleanHtmlText(page.name) : "";
+  const details = ["requisitionDetails", "jobDescriptionDetails"].flatMap((key) =>
+    key in page && Array.isArray(page[key as keyof typeof page]) ? page[key as keyof typeof page] as unknown[] : []);
+  const lines: string[] = [];
+  const locationTexts: string[] = [];
+  const employmentTexts: string[] = [];
+  for (const detail of details) {
+    if (detail === null || typeof detail !== "object") continue;
+    const name = "name" in detail && typeof detail.name === "string" ? detail.name : "";
+    const raw = "value" in detail ? detail.value : undefined;
+    const values = Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string")
+      : typeof raw === "string" ? [raw] : [];
+    if (values.length === 0) continue;
+    lines.push(`${name}: ${values.join("\n")}`);
+    if (/location|勤務地|勤務場所/i.test(name)) locationTexts.push(...values);
+    if (/employment|雇用形態|契約形態/i.test(name)) employmentTexts.push(...values);
+  }
+  const descriptionText = cleanHtmlText(lines.join("\n"));
+  if (title === "" || descriptionText.length < 40) return null;
+  return { title, descriptionText, searchText: `${title}\n${descriptionText}`, locationTexts, employmentTexts };
 }
 
 function documentFromObject(job: Record<string, unknown>): SourceDocument {
@@ -242,10 +277,11 @@ function extractVisa(input: string, sourceUrl: string, evidence: EvidenceCandida
 function extractLocations(document: SourceDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LocationFact> {
   const locations: LocationFact[] = [];
   for (const original of document.locationTexts) {
-    const japan = /Japan|日本|Tokyo|東京|Fukuoka|福岡|Osaka|大阪/i.test(original);
+    const countryCode = inferCountryCode(original);
+    const japan = countryCode === "JP";
     const remote = /remote|リモート|在宅|telecommute/i.test(original);
     locations.push({
-      countryCode: japan ? "JP" : null,
+      countryCode,
       prefecture: /Tokyo|東京/i.test(original) ? "東京都" : /Fukuoka|福岡/i.test(original) ? "福岡県" : /Osaka|大阪/i.test(original) ? "大阪府" : null,
       city: null,
       addressText: original,
@@ -256,11 +292,24 @@ function extractLocations(document: SourceDocument, sourceUrl: string, evidence:
   return fact(locations);
 }
 
+function inferCountryCode(value: string): string | null {
+  const countries: Array<[string, RegExp]> = [
+    ["JP", /Japan|日本|Tokyo|東京|Fukuoka|福岡|Osaka|大阪|Kanagawa|神奈川|Chiba|千葉|Saitama|埼玉/i],
+    ["TW", /Taiwan|Taipei|台湾|台北/i], ["KR", /South Korea|Korea|Seoul|韓国|ソウル/i],
+    ["CN", /China|Beijing|Shanghai|中国|北京|上海/i], ["US", /United States|USA|San Francisco|New York|Florida|Washington,? DC|Virginia|California/i],
+    ["GB", /United Kingdom|\bUK\b|London/i], ["NL", /Netherlands|Amsterdam/i], ["VN", /Vietnam|Hồ Chí Minh/i],
+    ["TR", /Türkiye|Turkey|Istanbul/i], ["BR", /Brazil|São Paulo/i], ["SG", /Singapore/i],
+    ["TH", /Thailand|Bangkok/i], ["HK", /Hong Kong/i], ["IN", /India|Bangalore|Bengaluru|Gurugram/i],
+    ["AU", /Australia|Melbourne|Sydney/i], ["DE", /Germany|Berlin|Munich/i], ["FR", /France|Paris/i],
+  ];
+  return countries.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
+}
+
 function extractLanguages(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LanguageFact> {
   const results: LanguageFact[] = [];
   const patterns: Array<[string, RegExp]> = [
-    ["ja", /(JLPT\s*N[1-5]|日本語.{0,16}(ネイティブ|ビジネス|日常会話|N[1-5]))/gi],
-    ["en", /(TOEIC\s*\d{3,4}|英語.{0,16}(ネイティブ|ビジネス|日常会話))/gi],
+    ["ja", /(JLPT\s*N[1-5]|日本語.{0,16}(ネイティブ|ビジネス|日常会話|N[1-5])|Japanese\s*:?.{0,16}(native|business|conversational|N[1-5]))/gi],
+    ["en", /(TOEIC\s*\d{3,4}|英語.{0,16}(ネイティブ|ビジネス|日常会話)|English\s*:?.{0,16}(native|business|conversational))/gi],
     ["zh", /(中国語.{0,16}(ネイティブ|ビジネス|日常会話)|Mandarin|Chinese)/gi],
   ];
   for (const [languageCode, pattern] of patterns) {
@@ -302,6 +351,13 @@ function extractCompensation(input: string, sourceUrl: string, evidence: Evidenc
         maximumAmount: Number(range[2]) * 10_000, isCalculated: false,
       }],
     };
+  }
+  const monthlyThousands = /[￥¥]\s*(\d{2,4})\s*K\s*(?:[〜～~-]|to)\s*[￥¥]?\s*(\d{2,4})\s*K\s*\/\s*Month/i.exec(input);
+  if (monthlyThousands?.[1] !== undefined && monthlyThousands[2] !== undefined) {
+    evidence.push(quote("compensation", monthlyThousands[0], sourceUrl, "jpy monthly thousands range"));
+    return { state: "known", values: [{ compensationKind: "base", currency: "JPY", period: "month",
+      minimumAmount: Number(monthlyThousands[1]) * 1_000, maximumAmount: Number(monthlyThousands[2]) * 1_000,
+      isCalculated: false }] };
   }
   const monthly = /(?:月給|初任給)[：:\s]*(\d{2,3}(?:,\d{3})?)\s*円/i.exec(input);
   if (monthly?.[1] === undefined) return { state: "unknown", values: [] };

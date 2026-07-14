@@ -194,7 +194,10 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   return <section className="empty-state"><AlertCircle size={25} /><h2>{title}</h2><p>{detail}</p></section>;
 }
 
-function sourceLabel(kind: string): string { return kind === "greenhouse" ? "Greenhouse" : kind === "schema_org" ? "JobPosting" : "手動確認"; }
+function sourceLabel(kind: string): string {
+  return ({ greenhouse: "Greenhouse", schema_org: "JobPosting", hrmos: "HRMOS", herp: "HERP", jobcan: "Jobcan",
+    airwork: "AirWork", engage: "engage", talentio: "Talentio", manual: "手動確認" } as Record<string, string>)[kind] ?? kind;
+}
 function formatDate(value: string): string { return new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit" }).format(new Date(value)); }
 function formatTime(value?: string): string { return value === undefined ? "—" : new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
 function formatDateTime(value: unknown): string { return typeof value === "string" || value instanceof Date ? new Intl.DateTimeFormat("ja-JP", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—"; }

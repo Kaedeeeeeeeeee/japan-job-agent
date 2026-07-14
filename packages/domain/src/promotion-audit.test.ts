@@ -19,9 +19,10 @@ describe("JETRO OFP promotion audit snapshot", () => {
 
   it("only calls companies active when current official jobs were synchronized", () => {
     const active = audit.companies.filter((row) => row.status === "promoted_active");
-    expect(active).toHaveLength(10);
+    expect(active).toHaveLength(30);
     expect(active.every((row) => row.currentJobCount > 0)).toBe(true);
-    expect(audit.sourceCounts.reduce((sum, row) => sum + row.jobs, 0)).toBe(139);
+    expect(audit.sourceCounts.reduce((sum, row) => sum + row.jobs, 0)).toBe(270);
+    expect(audit.sourceCounts.map((row) => row.source_kind)).toEqual(expect.arrayContaining(["airwork", "engage", "talentio"]));
   });
 
   it("contains no contact-person fields or obvious phone/email payloads", () => {

@@ -71,7 +71,7 @@ integration("Canonical strong-rule materialization", () => {
 
 async function fixture(
   db: Kysely<OutboxDatabase>,
-  sourceKind: "greenhouse" | "schema_org" | "manual" | "hrmos" | "herp" | "jobcan",
+  sourceKind: "greenhouse" | "schema_org" | "manual" | "hrmos" | "herp" | "jobcan" | "airwork" | "engage" | "talentio",
   title: string,
   url: string,
 ): Promise<{ sourceId: string; recordId: string; extractionId: string }> {

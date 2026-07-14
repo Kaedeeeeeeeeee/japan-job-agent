@@ -29,6 +29,7 @@
     "discovery:audit-candidates": "tsx scripts/audit-recruitment-candidates.ts",
     "discovery:promote": "tsx scripts/promote-jetro-companies.ts",
     "discovery:report": "tsx scripts/export-promotion-report.ts",
+    "corpus:report": "tsx scripts/export-corpus-report.ts",
     "sync:schema": "tsx scripts/sync-schema-org.ts",
     "extract:pending": "tsx scripts/extract-pending.ts",
     "canonical:materialize": "tsx scripts/materialize-canonical.ts",

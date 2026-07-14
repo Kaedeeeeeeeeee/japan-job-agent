@@ -19,7 +19,7 @@ try {
       JOIN source_discovery_candidates sdc ON sdc.linked_source_instance_id=s.id AND sdc.state='verified'
       JOIN company_discovery_candidates cdc ON cdc.id=sdc.company_discovery_candidate_id
       JOIN company_promotion_audits pa ON pa.company_discovery_candidate_id=cdc.id AND pa.audit_key=$1
-      LEFT JOIN source_job_records r ON r.source_instance_id=s.id WHERE s.verification_state='verified'
+      LEFT JOIN source_job_records r ON r.source_instance_id=s.id AND r.lifecycle_state='active' WHERE s.verification_state='verified'
       GROUP BY s.source_kind ORDER BY s.source_kind`, [auditKey]);
   const statusCounts = Object.fromEntries(Object.entries(Object.groupBy(rows.rows, (row) => row.status))
     .map(([status, values]) => [status, values?.length ?? 0]));

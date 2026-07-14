@@ -5,7 +5,7 @@ import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { CanonicalService } from "../packages/canonical/src/canonical-service.js";
 import { HrmosConnector } from "../packages/connectors-hrmos/src/hrmos-connector.js";
-import { PublicCareerConnector } from "../packages/connectors-public-career/src/public-career-connector.js";
+import { PublicCareerConnector, type PublicCareerKind } from "../packages/connectors-public-career/src/public-career-connector.js";
 import { SchemaOrgConnector } from "../packages/connectors-schema-org/src/schema-org-connector.js";
 import type { SourceInstanceRef, SourceKind } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
@@ -21,7 +21,7 @@ interface EntrypointRow { externalKey: string; displayName: string; officialSite
 interface EntrypointFile { auditedAt: string; results: EntrypointRow[] }
 interface CandidateRow extends EntrypointRow { url: string }
 interface CandidateFile { auditedAt: string; results: CandidateRow[] }
-type SupportedKind = "hrmos" | "herp" | "jobcan" | "schema_org";
+type SupportedKind = "hrmos" | "herp" | "jobcan" | "airwork" | "engage" | "talentio" | "schema_org";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) throw new Error("DATABASE_URL is required");
@@ -164,7 +164,7 @@ async function promoteSource(identity: { candidateId: string; companyId: string 
   const source: SourceInstanceRef = { id: seeded.sourceInstanceId, sourceKind: kind as SourceKind, tenantKey, baseUrl };
   const connector = kind === "hrmos" ? new HrmosConnector()
     : kind === "schema_org" ? new SchemaOrgConnector()
-    : new PublicCareerConnector(kind);
+    : new PublicCareerConnector(kind as PublicCareerKind);
   const request = kind === "schema_org" ? {
     source, idempotencyKey: `${auditKey}:${hash(detected.url)}`,
     recordIdentity: { sourceInstanceId: source.id, stableKey: tenantKey, canonicalUrl: detected.url },
@@ -207,20 +207,27 @@ function aggregateSources(entry: EntrypointRow | undefined, candidates: Candidat
   const add = (source: DetectedRecruitmentSource | null) => {
     if (source === null) return;
     if (source.kind === "schema_org" && detectSource(source.url)?.kind === "hrmos") return;
-    sources.set(`${source.kind}:${source.tenantKey}:${source.url}`, source);
+    const key = source.collection ? `${source.kind}:${source.tenantKey}` : `${source.kind}:${source.tenantKey}:${source.url}`;
+    const existing = sources.get(key);
+    if (existing === undefined || new URL(source.url).pathname.split("/").length > new URL(existing.url).pathname.split("/").length) {
+      sources.set(key, source);
+    }
   };
   if (entry !== undefined) {
     entry.audit.detectedSources.forEach(add);
     entry.audit.candidateLinks.map(detectSource).forEach(add);
   }
   for (const candidate of candidates) {
+    add(detectSource(candidate.url));
     candidate.audit.detectedSources.forEach(add);
     candidate.audit.candidateLinks.map(detectSource).forEach(add);
   }
   return [...sources.values()];
 }
 
-function supported(kind: string): kind is SupportedKind { return ["hrmos", "herp", "jobcan", "schema_org"].includes(kind); }
+function supported(kind: string): kind is SupportedKind {
+  return ["hrmos", "herp", "jobcan", "airwork", "engage", "talentio", "schema_org"].includes(kind);
+}
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex").slice(0, 16); }
 function isRecruitmentPlatform(host: string): boolean {
   return /(^|\.)(hrmos\.co|herp\.careers|jobcan\.jp|talentio\.com|en-gage\.net|wantedly\.com|arwrk\.net|jbplt\.jp)$/.test(host);
