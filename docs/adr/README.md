@@ -20,4 +20,4 @@
 | [016](./016-orchestrator-finalized-snapshot.md) | Orchestrator finalizes snapshots | Accepted |
 | [017](./017-closure-circuit-breaker.md) | Closing requires interval and circuit safety | Accepted |
 | [018](./018-temporal-outbox-idempotency.md) | Temporal and Outbox are idempotent | Accepted |
-
+| [019](./019-llm-evidence-and-embedding-recall.md) | LLM proposes evidence; embeddings recall only | Accepted |
