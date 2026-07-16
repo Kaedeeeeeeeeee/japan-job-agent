@@ -52,12 +52,19 @@ integration("Extraction replay and evidence persistence", () => {
     expect(v2Result).toMatchObject({ status: "succeeded", reused: false });
     expect(replay).toMatchObject({ extractionId: v2Result.extractionId, status: "succeeded", reused: true });
 
-    const counts = await sql<{ raw_versions: string; extractions: string; employment: string; skills: string }>`SELECT
+    const counts = await sql<{ raw_versions: string; extractions: string; employment: string; skills: string;
+      lineage: string; head: string }>`SELECT
       (SELECT count(*)::text FROM source_job_versions WHERE source_job_record_id = ${recordId}::uuid) raw_versions,
       (SELECT count(*)::text FROM source_job_extractions WHERE source_job_version_id = ${versionId}::uuid) extractions,
       (SELECT count(*)::text FROM extraction_employment_types WHERE extraction_id = ${v2Result.extractionId}::uuid) employment,
-      (SELECT count(*)::text FROM extraction_skills WHERE extraction_id = ${v2Result.extractionId}::uuid) skills`.execute(db);
-    expect(counts.rows[0]).toEqual({ raw_versions: "1", extractions: "2", employment: "2", skills: "3" });
+      (SELECT count(*)::text FROM extraction_skills WHERE extraction_id = ${v2Result.extractionId}::uuid) skills,
+      (SELECT count(*)::text FROM source_job_extraction_lineage lineage
+        JOIN source_job_extractions extraction ON extraction.id=lineage.extraction_id
+        WHERE extraction.source_job_version_id=${versionId}::uuid) lineage,
+      (SELECT extraction_id::text FROM source_job_extraction_heads
+        WHERE source_job_record_id=${recordId}::uuid) head`.execute(db);
+    expect(counts.rows[0]).toEqual({ raw_versions: "1", extractions: "2", employment: "2", skills: "3",
+      lineage: "2", head: v2Result.extractionId });
 
     const missingEvidence = await sql<{ count: string }>`SELECT count(*)::text AS count
       FROM extraction_field_states f

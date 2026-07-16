@@ -1,0 +1,2956 @@
+{
+  "generatedAt": "2026-07-13T23:46:19.893Z",
+  "auditKey": "jetro-promotion:2026-07-14",
+  "totalCompanies": 374,
+  "linkedCompanies": 374,
+  "statusCounts": {
+    "insecure_source": 69,
+    "verified_no_current_job": 59,
+    "unstructured_career_page": 179,
+    "promoted_active": 30,
+    "unreachable": 33,
+    "unsupported_source": 4
+  },
+  "sourceCounts": [
+    {
+      "source_kind": "schema_org",
+      "sources": 1,
+      "jobs": 1
+    },
+    {
+      "source_kind": "hrmos",
+      "sources": 3,
+      "jobs": 89
+    },
+    {
+      "source_kind": "herp",
+      "sources": 4,
+      "jobs": 43
+    },
+    {
+      "source_kind": "jobcan",
+      "sources": 1,
+      "jobs": 5
+    },
+    {
+      "source_kind": "airwork",
+      "sources": 10,
+      "jobs": 60
+    },
+    {
+      "source_kind": "engage",
+      "sources": 10,
+      "jobs": 56
+    },
+    {
+      "source_kind": "talentio",
+      "sources": 2,
+      "jobs": 16
+    }
+  ],
+  "companies": [
+    {
+      "externalKey": "100001",
+      "displayName": "株式会社山水荘",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100002",
+      "displayName": "株式会社光大",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100005",
+      "displayName": "山陽精工株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100010",
+      "displayName": "株式会社コスモテック",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100012",
+      "displayName": "大山食品株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100017",
+      "displayName": "株式会社ブートコミュニケーション",
+      "status": "promoted_active",
+      "currentJobCount": 1,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/2025-bootcommunication",
+          "kind": "airwork",
+          "tenantKey": "2025-bootcommunication",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100020",
+      "displayName": "株式会社ワイヤードビーンズ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100021",
+      "displayName": "共和産業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100024",
+      "displayName": "株式会社スリーアイ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100027",
+      "displayName": "ジット株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100028",
+      "displayName": "株式会社Spiral",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100030",
+      "displayName": "ラックデザイン株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100031",
+      "displayName": "株式会社フィギュアネット",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100046",
+      "displayName": "株式会社エムジェイテック",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100047",
+      "displayName": "アドバンストビジネスサービス株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100049",
+      "displayName": "株式会社アロマジョイン",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100051",
+      "displayName": "有限会社奥州秋保温泉蘭亭",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100058",
+      "displayName": "株式会社コネクター・ジャパン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100065",
+      "displayName": "大分製紙株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100072",
+      "displayName": "アカマツ株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100075",
+      "displayName": "株式会社OTis",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100076",
+      "displayName": "株式会社Asia-Pacific Produce",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100078",
+      "displayName": "マイクロ株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100082",
+      "displayName": "米盛建設株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100083",
+      "displayName": "MicroWorld株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100084",
+      "displayName": "株式会社栄組",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100095",
+      "displayName": "株式会社大成エンジニアリング",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100096",
+      "displayName": "株式会社大日製作所",
+      "status": "promoted_active",
+      "currentJobCount": 16,
+      "detectedSources": [
+        {
+          "url": "https://herp.careers/v1/dainichi1975",
+          "kind": "herp",
+          "tenantKey": "dainichi1975",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100098",
+      "displayName": "GMOリサーチ株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 5,
+      "detectedSources": [
+        {
+          "url": "https://recruit.jobcan.jp/gmo-research",
+          "kind": "jobcan",
+          "tenantKey": "gmo-research",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100102",
+      "displayName": "知能技術株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100108",
+      "displayName": "株式会社さかうえ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100109",
+      "displayName": "GokenNIHON株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100110",
+      "displayName": "株式会社カネミツ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100116",
+      "displayName": "株式会社システムフレンド",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100131",
+      "displayName": "AWL株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100132",
+      "displayName": "株式会社協同工芸社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100134",
+      "displayName": "ワタナベ工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100137",
+      "displayName": "株式会社南海精工所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100144",
+      "displayName": "株式会社ARCA",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100146",
+      "displayName": "株式会社シーパーツ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100150",
+      "displayName": "ダイトー工業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100156",
+      "displayName": "株式会社関東製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100159",
+      "displayName": "アクセスエンジニアリング株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100168",
+      "displayName": "アイフォーコム株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100172",
+      "displayName": "エバオン株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100182",
+      "displayName": "株式会社ヒロフードサービス",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100186",
+      "displayName": "アルチテック株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://artitech.co.jp/recruit/internship/",
+          "kind": "schema_org",
+          "tenantKey": "artitech.co.jp:recruit:internship:",
+          "collection": false
+        }
+      ]
+    },
+    {
+      "externalKey": "100193",
+      "displayName": "ユウアイ電子工業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100200",
+      "displayName": "株式会社天晴データネット",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100205",
+      "displayName": "サンエー電機株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100219",
+      "displayName": "渋谷レックス株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100223",
+      "displayName": "株式会社長津製作所",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100225",
+      "displayName": "有限会社安藤与吉商店",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100226",
+      "displayName": "岸保産業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://www.wantedly.com/companies/company_4045604",
+          "kind": "wantedly",
+          "tenantKey": "company_4045604",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100227",
+      "displayName": "FTIJAPAN株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100230",
+      "displayName": "株式会社秋田屋",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100234",
+      "displayName": "バリューベース株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100238",
+      "displayName": "株式会社モス",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100242",
+      "displayName": "株式会社フリーインターナショナル",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100243",
+      "displayName": "中日本カプセル株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100246",
+      "displayName": "レグナテック株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100247",
+      "displayName": "株式会社輝陽",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100249",
+      "displayName": "エンシュウ株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100250",
+      "displayName": "株式会社三本松茶屋",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100254",
+      "displayName": "ツバメ無線株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100258",
+      "displayName": "株式会社ダイビック",
+      "status": "unsupported_source",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://www.wantedly.com/companies/diveintocode",
+          "kind": "wantedly",
+          "tenantKey": "diveintocode",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100259",
+      "displayName": "株式会社芝田化工設計",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100267",
+      "displayName": "株式会社トレードタックスウェストジャパン",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100273",
+      "displayName": "株式会社テクノソリューション",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100285",
+      "displayName": "堀内商事株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 7,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/horiuchi-shoji_saiyo/",
+          "kind": "engage",
+          "tenantKey": "horiuchi-shoji_saiyo",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100288",
+      "displayName": "株式会社セイキョウ",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100296",
+      "displayName": "株式会社Arttrav",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100299",
+      "displayName": "カネイシ株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 11,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/trzles3980jv3bt",
+          "kind": "airwork",
+          "tenantKey": "trzles3980jv3bt",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100307",
+      "displayName": "ザマ・ジャパン株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100309",
+      "displayName": "株式会社光建",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100311",
+      "displayName": "株式会社積進",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100318",
+      "displayName": "九州精密工業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100323",
+      "displayName": "株式会社ビッグウェーブカワサキ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100327",
+      "displayName": "小山化学株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100329",
+      "displayName": "遠赤青汁株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/lfb970c9ietsd59",
+          "kind": "airwork",
+          "tenantKey": "lfb970c9ietsd59",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100331",
+      "displayName": "株式会社おしん",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100336",
+      "displayName": "丸京製菓株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100342",
+      "displayName": "株式会社バンテック",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100347",
+      "displayName": "丹波貿易株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100348",
+      "displayName": "株式会社ＳＲＴ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100349",
+      "displayName": "ジャスティン株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100350",
+      "displayName": "日印食品開発有限会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100356",
+      "displayName": "株式会社北村組",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100357",
+      "displayName": "株式会社日本マイクロＭＩＭホールディングス",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100359",
+      "displayName": "株式会社愛しとーと",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100360",
+      "displayName": "株式会社いさわ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100361",
+      "displayName": "株式会社eftax",
+      "status": "unsupported_source",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://www.wantedly.com/companies/eftax",
+          "kind": "wantedly",
+          "tenantKey": "eftax",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100365",
+      "displayName": "大喜産業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100366",
+      "displayName": "東京特殊印刷工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100367",
+      "displayName": "株式会社ナカヒョウ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100368",
+      "displayName": "株式会社サンウェル",
+      "status": "promoted_active",
+      "currentJobCount": 15,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/sunwells_saiyo/",
+          "kind": "engage",
+          "tenantKey": "sunwells_saiyo",
+          "collection": true
+        },
+        {
+          "url": "https://open.talentio.com/r/1/c/sunwells/homes/2052",
+          "kind": "talentio",
+          "tenantKey": "sunwells",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100370",
+      "displayName": "株式会社エーアイテック",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100372",
+      "displayName": "株式会社KERAKERA",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100373",
+      "displayName": "株式会社まんてん",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100376",
+      "displayName": "EBC株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100377",
+      "displayName": "ＩｎｄｏーＳａｋｕｒａ Ｓｏｆｔｗａｒｅ Ｊａｐａｎ株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100378",
+      "displayName": "ロボセンサー技研株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100381",
+      "displayName": "株式会社ジェイエスピー",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100382",
+      "displayName": "株式会社ワールドバリュー・ブリッジ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100384",
+      "displayName": "ＫＪケミカルズ株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 8,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/ccdpimzmkpbt3fa",
+          "kind": "airwork",
+          "tenantKey": "ccdpimzmkpbt3fa",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100386",
+      "displayName": "倉敷ステーションホテル株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100388",
+      "displayName": "パイフォトニクス株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100392",
+      "displayName": "株式会社櫻製作所",
+      "status": "promoted_active",
+      "currentJobCount": 4,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/sakuraseisakusho/",
+          "kind": "engage",
+          "tenantKey": "sakuraseisakusho",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100394",
+      "displayName": "株式会社Double Feather Partners",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100397",
+      "displayName": "株式会社高知丸高",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100401",
+      "displayName": "株式会社ピュア・メディカル",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100403",
+      "displayName": "株式会社鹿田産業",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100405",
+      "displayName": "株式会社ブルー・スターＲ＆Ｄ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100407",
+      "displayName": "EAGLYS株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 7,
+      "detectedSources": [
+        {
+          "url": "https://herp.careers/v1/eaglys",
+          "kind": "herp",
+          "tenantKey": "eaglys",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100408",
+      "displayName": "日本ベース株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100409",
+      "displayName": "ＳＴＥＰ ＪＰ株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100414",
+      "displayName": "マテックス株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100416",
+      "displayName": "株式会社NEXT",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100422",
+      "displayName": "NUProtein株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100428",
+      "displayName": "大阪トラクター株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100435",
+      "displayName": "株式会社吉谷機械製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100436",
+      "displayName": "株式会社Samaria",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100441",
+      "displayName": "芦森工業株式会社",
+      "status": "unsupported_source",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://ashimori.jbplt.jp",
+          "kind": "jobposting",
+          "tenantKey": "ashimori",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100442",
+      "displayName": "ケイナンクリーン株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100444",
+      "displayName": "株式会社名友産商",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100446",
+      "displayName": "株式会社プラスワン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100450",
+      "displayName": "アラウンド・ザ・ワールド株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100453",
+      "displayName": "株式会社ヨコオ",
+      "status": "promoted_active",
+      "currentJobCount": 21,
+      "detectedSources": [
+        {
+          "url": "https://hrmos.co/pages/yokowo/jobs",
+          "kind": "hrmos",
+          "tenantKey": "yokowo",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100455",
+      "displayName": "有限会社アイプランニング",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100459",
+      "displayName": "サクラテック株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100462",
+      "displayName": "株式会社飯尾電機",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100464",
+      "displayName": "甲府ビルサービス株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100468",
+      "displayName": "株式会社アクトプロ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100471",
+      "displayName": "株式会社槐工務店",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100474",
+      "displayName": "四国計測工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100475",
+      "displayName": "株式会社SEEDSUPPLY",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100480",
+      "displayName": "株式会社荒谷商会",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100481",
+      "displayName": "いよせき株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100483",
+      "displayName": "富士テクノ工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100485",
+      "displayName": "アイギスセキュリティ株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100487",
+      "displayName": "グリーンツール株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 8,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/greentool_saiyo/",
+          "kind": "engage",
+          "tenantKey": "greentool_saiyo",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100492",
+      "displayName": "株式会社近藤設備",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100496",
+      "displayName": "株式会社土屋合成",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100498",
+      "displayName": "福井鋲螺株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100499",
+      "displayName": "株式会社エフテック",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100500",
+      "displayName": "愛洋株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100501",
+      "displayName": "高砂電気工業株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 1,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/takasago-electric/",
+          "kind": "engage",
+          "tenantKey": "takasago-electric",
+          "collection": true
+        },
+        {
+          "url": "https://arwrk.net/recruit/wrw231lseuev22i",
+          "kind": "airwork",
+          "tenantKey": "wrw231lseuev22i",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100503",
+      "displayName": "ジャポックスコーポレーション株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100505",
+      "displayName": "SK弁理士法人",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100508",
+      "displayName": "株式会社いけうち",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100509",
+      "displayName": "株式会社港屋珈琲",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100510",
+      "displayName": "ニッコン情報システム株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100511",
+      "displayName": "株式会社ゲートジャパン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100515",
+      "displayName": "株式会社ONODERA USER RUN",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100516",
+      "displayName": "株式会社サンテクノ",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100517",
+      "displayName": "株式会社流通サービス",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100519",
+      "displayName": "SpoLive Interactive株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100521",
+      "displayName": "テトラ・アビエーション株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100522",
+      "displayName": "クラウドサーカス株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100523",
+      "displayName": "株式会社オプト・システム",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100529",
+      "displayName": "株式会社industria",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100530",
+      "displayName": "株式会社トランスビジョン",
+      "status": "promoted_active",
+      "currentJobCount": 16,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/transvision/",
+          "kind": "engage",
+          "tenantKey": "transvision",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100531",
+      "displayName": "廣瀬製紙株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100533",
+      "displayName": "リンクフード株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100534",
+      "displayName": "株式会社やっちゃばくらじ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100535",
+      "displayName": "株式会社オール",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100536",
+      "displayName": "株式会社アサノ大成基礎エンジニアリング",
+      "status": "promoted_active",
+      "currentJobCount": 27,
+      "detectedSources": [
+        {
+          "url": "https://hrmos.co/pages/atk-eng/jobs",
+          "kind": "hrmos",
+          "tenantKey": "atk-eng",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100539",
+      "displayName": "山陰設備工業株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100540",
+      "displayName": "株式会社渡邊製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100541",
+      "displayName": "株式会社アサイン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/fyq3ekiq9zrdt0q/6660678/",
+          "kind": "airwork",
+          "tenantKey": "fyq3ekiq9zrdt0q",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100542",
+      "displayName": "株式会社本間総合計画",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100546",
+      "displayName": "京葉ベンド株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100550",
+      "displayName": "長野ポンプ株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100551",
+      "displayName": "トウショク株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 10,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/egjemqcd608hba2",
+          "kind": "airwork",
+          "tenantKey": "egjemqcd608hba2",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100553",
+      "displayName": "株式会社イゲタ金網",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100557",
+      "displayName": "株式会社お茶の沢田園",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100558",
+      "displayName": "有限会社かごしま有機生産組合",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100559",
+      "displayName": "株式会社SAMI Japan",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100560",
+      "displayName": "ナカウン株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100562",
+      "displayName": "株式会社河道製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100563",
+      "displayName": "株式会社亀岡工務店",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100567",
+      "displayName": "株式会社MIJ labo",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100568",
+      "displayName": "株式会社森八大名閣",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100570",
+      "displayName": "株式会社中央電機計器製作所",
+      "status": "promoted_active",
+      "currentJobCount": 3,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/cew/",
+          "kind": "engage",
+          "tenantKey": "cew",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100571",
+      "displayName": "HRnetOne株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100572",
+      "displayName": "有限会社川田製作所",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100575",
+      "displayName": "フジモールド工業株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100576",
+      "displayName": "有限会社エイチ・ティ・エス",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100577",
+      "displayName": "是常精工株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100580",
+      "displayName": "株式会社島川製作所",
+      "status": "promoted_active",
+      "currentJobCount": 2,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/shimakawa-ss/",
+          "kind": "engage",
+          "tenantKey": "shimakawa-ss",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "100581",
+      "displayName": "株式会社DMC aizu",
+      "status": "promoted_active",
+      "currentJobCount": 1,
+      "detectedSources": [
+        {
+          "url": "https://dmc-aizu.co.jp/recruit/",
+          "kind": "schema_org",
+          "tenantKey": "dmc-aizu.co.jp:recruit:",
+          "collection": false
+        }
+      ]
+    },
+    {
+      "externalKey": "100584",
+      "displayName": "AITOYA株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100587",
+      "displayName": "株式会社キクノ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100589",
+      "displayName": "株式会社土木管理総合試験所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100590",
+      "displayName": "株式会社内山住宅",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100822",
+      "displayName": "クズミ電子工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100855",
+      "displayName": "北海道ＮＳソリューションズ株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "100856",
+      "displayName": "ミナトゴム株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101053",
+      "displayName": "三洋グラビア株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101119",
+      "displayName": "GMOグローバルEC株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101124",
+      "displayName": "赤田工業株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 4,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/wqzopwudrmvlzxb",
+          "kind": "airwork",
+          "tenantKey": "wqzopwudrmvlzxb",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "101127",
+      "displayName": "Guide Robotics 株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101152",
+      "displayName": "ハイテック株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101219",
+      "displayName": "株式会社Okwi",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101221",
+      "displayName": "株式会社中家製作所",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101224",
+      "displayName": "マルイチエクソム株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101225",
+      "displayName": "株式会社ダンデライオンズ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101226",
+      "displayName": "中央化工機株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101252",
+      "displayName": "株式会社ササヤマ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101286",
+      "displayName": "株式会社OCA JAPAN",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101287",
+      "displayName": "株式会社SeiRogai",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101288",
+      "displayName": "株式会社KMユナイテッド",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101350",
+      "displayName": "SOC株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101383",
+      "displayName": "株式会社OCA OKINAWA",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101416",
+      "displayName": "株式会社ヴァイオス",
+      "status": "promoted_active",
+      "currentJobCount": 1,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/c0gvukag5g62nzn",
+          "kind": "airwork",
+          "tenantKey": "c0gvukag5g62nzn",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "101449",
+      "displayName": "スリーワンデザイン株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101515",
+      "displayName": "株式会社調和技研",
+      "status": "promoted_active",
+      "currentJobCount": 1,
+      "detectedSources": [
+        {
+          "url": "https://herp.careers/v1/chowagiken",
+          "kind": "herp",
+          "tenantKey": "chowagiken",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "101581",
+      "displayName": "エヌエスディ販売株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101614",
+      "displayName": "山陰クボタ水道用材株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101680",
+      "displayName": "柴屋株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101746",
+      "displayName": "株式会社ヒラテ技研",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101779",
+      "displayName": "見田工作株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101812",
+      "displayName": "株式会社西原鉄工所",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101878",
+      "displayName": "アンカーテクノロジーズ株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 4,
+      "detectedSources": [
+        {
+          "url": "https://open.talentio.com/r/1/c/anchor-u/homes/4042",
+          "kind": "talentio",
+          "tenantKey": "anchor-u",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "101944",
+      "displayName": "株式会社鯖江工業所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101977",
+      "displayName": "松文産業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "101978",
+      "displayName": "フジモトボサード株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102010",
+      "displayName": "コーワテック株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102043",
+      "displayName": "株式会社OSAKAおれんじぼっくす",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102044",
+      "displayName": "インフィック株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102045",
+      "displayName": "株式会社スプリング",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102076",
+      "displayName": "株式会社和コーポレーション",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102109",
+      "displayName": "京都フュージョニアリング株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 41,
+      "detectedSources": [
+        {
+          "url": "https://hrmos.co/pages/kfandsle/jobs",
+          "kind": "hrmos",
+          "tenantKey": "kfandsle",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "102142",
+      "displayName": "湯本電機株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102175",
+      "displayName": "富士紙化学株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102208",
+      "displayName": "株式会社エナジックインターナショナル",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102242",
+      "displayName": "枚岡合金工具株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102307",
+      "displayName": "株式会社桔梗",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102340",
+      "displayName": "株式会社キタイ",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102341",
+      "displayName": "株式会社ヤマサ脇口水産",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102342",
+      "displayName": "金田コーポレーション株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102343",
+      "displayName": "中野BC株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102344",
+      "displayName": "株式会社アクロエッジ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102373",
+      "displayName": "ISBマーケティング株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102439",
+      "displayName": "株式会社豊裕工業",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102474",
+      "displayName": "レプリス株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102505",
+      "displayName": "株式会社金子製作所",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102538",
+      "displayName": "岩村醸造株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102604",
+      "displayName": "株式会社ニューケミカル",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102637",
+      "displayName": "K&A JPN株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102670",
+      "displayName": "南海スチール株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102671",
+      "displayName": "エルアラビ東洋一エンジニアリング株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102673",
+      "displayName": "アトム株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102703",
+      "displayName": "ユーエスウラサキ株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102704",
+      "displayName": "株式会社西村組",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102736",
+      "displayName": "ジャービス商事株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102769",
+      "displayName": "株式会社江川工芸社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102803",
+      "displayName": "株式会社新鋭システム",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102804",
+      "displayName": "SK hynix Japan株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102835",
+      "displayName": "コグラフ株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102868",
+      "displayName": "山陽染工株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "102901",
+      "displayName": "鶴山運送株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103033",
+      "displayName": "有限会社東海産",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103066",
+      "displayName": "株式会社Hearbest",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103132",
+      "displayName": "ステートストリート信託銀行株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103165",
+      "displayName": "Yap株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103198",
+      "displayName": "株式会社エクス",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103231",
+      "displayName": "株式会社スカイコム",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103264",
+      "displayName": "株式会社ＴＫ建装",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103330",
+      "displayName": "株式会社ゴーナイエレック",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103396",
+      "displayName": "サイエンスエッジ株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103397",
+      "displayName": "株式会社キョウワ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103429",
+      "displayName": "協和界面科学株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103463",
+      "displayName": "株式会社岡本工作機械製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103496",
+      "displayName": "株式会社RUTILEA",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103594",
+      "displayName": "協和マシン株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103595",
+      "displayName": "株式会社ゆみるめ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103693",
+      "displayName": "佐々木工業株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103726",
+      "displayName": "株式会社しんぷりーじー",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103792",
+      "displayName": "株式会社木内酒造1823",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103825",
+      "displayName": "株式会社インターブックス",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103891",
+      "displayName": "株式会社PNH",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "103990",
+      "displayName": "曲イ田中酒造株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104023",
+      "displayName": "株式会社メディアフュージョン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104056",
+      "displayName": "株式会社ツノダ",
+      "status": "promoted_active",
+      "currentJobCount": 6,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/pm9pqz23m5ghvos",
+          "kind": "airwork",
+          "tenantKey": "pm9pqz23m5ghvos",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "104155",
+      "displayName": "ワイエイシイガーター株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104254",
+      "displayName": "虎田砿業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104287",
+      "displayName": "株式会社D&W",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104353",
+      "displayName": "Aircom Technology Center Japan株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104452",
+      "displayName": "株式会社汎建製作所",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104518",
+      "displayName": "有限会社倉本水産",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104584",
+      "displayName": "四国電線株式会社株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104650",
+      "displayName": "鍋屋バイテック株式会社",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104683",
+      "displayName": "株式会社シーディア",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104716",
+      "displayName": "株式会社マインドワイズ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104749",
+      "displayName": "株式会社イオンテクノセンター",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104782",
+      "displayName": "株式会社ティーネットジャパン",
+      "status": "unreachable",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104815",
+      "displayName": "株式会社トマト",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104848",
+      "displayName": "小松開発工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104883",
+      "displayName": "JOBs Japan株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104914",
+      "displayName": "カンケンテクノ株式会社株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "104947",
+      "displayName": "株式会社LIMNO",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105014",
+      "displayName": "サンシード株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105046",
+      "displayName": "飯島建設株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105079",
+      "displayName": "岸本建設株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105112",
+      "displayName": "株式会社丸三老舗",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105178",
+      "displayName": "株式会社鐵建",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105277",
+      "displayName": "株式会社スリーファイン",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105278",
+      "displayName": "株式会社福大",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105310",
+      "displayName": "増永眼鏡株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105343",
+      "displayName": "名豊電機株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105409",
+      "displayName": "入江株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105442",
+      "displayName": "上村電建株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105475",
+      "displayName": "株式会社エムダイヤ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105541",
+      "displayName": "株式会社スタジオライツ",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105574",
+      "displayName": "株式会社SHINDO",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105607",
+      "displayName": "株式会社ミラプロ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105640",
+      "displayName": "三河鉱産株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105673",
+      "displayName": "株式会社アイ・エス・エス",
+      "status": "promoted_active",
+      "currentJobCount": 12,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/yslbllxn0mvu6gt",
+          "kind": "airwork",
+          "tenantKey": "yslbllxn0mvu6gt",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "105707",
+      "displayName": "株式会社ＲＩＣＯＳ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105739",
+      "displayName": "第一工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105772",
+      "displayName": "日工株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105805",
+      "displayName": "富士インフォックス・ネット株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105838",
+      "displayName": "Green Carbon株式会社",
+      "status": "unsupported_source",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://www.wantedly.com/companies/greencarbon2019",
+          "kind": "wantedly",
+          "tenantKey": "greencarbon2019",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "105871",
+      "displayName": "株式会社Eco-Pork",
+      "status": "promoted_active",
+      "currentJobCount": 19,
+      "detectedSources": [
+        {
+          "url": "https://herp.careers/v1/ecopork1129",
+          "kind": "herp",
+          "tenantKey": "ecopork1129",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "105872",
+      "displayName": "株式会社西武・プリンスホテルズワールドワイド（札幌プリンスホテル）",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105873",
+      "displayName": "株式会社Nanofiber Quantum Technologies",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105874",
+      "displayName": "株式会社カクニ茶藤",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "105937",
+      "displayName": "上野電機株式会社",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106003",
+      "displayName": "株式会社エリス(ELIS CO.,LTD.)",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106069",
+      "displayName": "株式会社Citruth",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106102",
+      "displayName": "双信電機株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 3,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/fotrfbfgzjfbwrw",
+          "kind": "airwork",
+          "tenantKey": "fotrfbfgzjfbwrw",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "106168",
+      "displayName": "Ｐｏｌａｒ Ｆｏｘ株式会社",
+      "status": "promoted_active",
+      "currentJobCount": 9,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/polarfox_career/",
+          "kind": "engage",
+          "tenantKey": "polarfox_career",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "106201",
+      "displayName": "株式会社Eat Creative",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106202",
+      "displayName": "株式会社株式会社ジェイアンドシー",
+      "status": "insecure_source",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106300",
+      "displayName": "株式会社HIVEC",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106399",
+      "displayName": "株式会社新来島どっく",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106465",
+      "displayName": "旭化工株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106531",
+      "displayName": "素朴屋株式会社株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106630",
+      "displayName": "株式会社ナピル",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106663",
+      "displayName": "PDOLE株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106861",
+      "displayName": "株式会社ヤマシタワークス",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106894",
+      "displayName": "株式会社ボーダレス・ジャパン",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": [
+        {
+          "url": "https://public.n-ats.hrmos.co/borderless-japan/jobs/2250117385311338496",
+          "kind": "schema_org",
+          "tenantKey": "n-ats:borderless-japan:2250117385311338496",
+          "collection": false
+        }
+      ]
+    },
+    {
+      "externalKey": "106927",
+      "displayName": "HL株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "106993",
+      "displayName": "株式会社Prodrone",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107026",
+      "displayName": "ベリシュア株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107059",
+      "displayName": "高柳電設工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107092",
+      "displayName": "株式会社ＳＡＺＯ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107158",
+      "displayName": "有限会社シンワ技術",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107191",
+      "displayName": "ユーピーアール株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107323",
+      "displayName": "株式会社丸昌",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107356",
+      "displayName": "株式会社タカギ",
+      "status": "promoted_active",
+      "currentJobCount": 4,
+      "detectedSources": [
+        {
+          "url": "https://arwrk.net/recruit/takagi-innerwear",
+          "kind": "airwork",
+          "tenantKey": "takagi-innerwear",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "107455",
+      "displayName": "ヤマハハイテックデザイン株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107488",
+      "displayName": "株式会社アンスコ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107587",
+      "displayName": "株式会社TokudAw",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107653",
+      "displayName": "坂田建設株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107719",
+      "displayName": "石原産業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107720",
+      "displayName": "株式会社マルイ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107785",
+      "displayName": "晶和電気工業株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107818",
+      "displayName": "株式会社KAWANO",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107885",
+      "displayName": "株式会社小野測器",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107886",
+      "displayName": "ジョブモア株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107888",
+      "displayName": "株式会社アナテック・ヤナコ",
+      "status": "promoted_active",
+      "currentJobCount": 3,
+      "detectedSources": [
+        {
+          "url": "https://en-gage.net/yanaco_career/",
+          "kind": "engage",
+          "tenantKey": "yanaco_career",
+          "collection": true
+        }
+      ]
+    },
+    {
+      "externalKey": "107890",
+      "displayName": "宮島醤油株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107917",
+      "displayName": "沼田土建株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107918",
+      "displayName": "スマイルホーム株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107919",
+      "displayName": "ファームドゥホールディングス株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107920",
+      "displayName": "株式会社株式会社三協",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107921",
+      "displayName": "TFBファクトリーズ株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107925",
+      "displayName": "ヒエン電工株式会社",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107926",
+      "displayName": "株式会社ワタミ",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107927",
+      "displayName": "株式会社GLW",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107950",
+      "displayName": "智頭電機株式会社",
+      "status": "verified_no_current_job",
+      "currentJobCount": 0,
+      "detectedSources": []
+    },
+    {
+      "externalKey": "107983",
+      "displayName": "SATO社会保険労務士法人",
+      "status": "unstructured_career_page",
+      "currentJobCount": 0,
+      "detectedSources": []
+    }
+  ]
+}

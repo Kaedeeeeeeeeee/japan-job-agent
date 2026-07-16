@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-07-13T23:58:12.375Z",
+  "activeCanonicalJobs": 660,
+  "eligibleForPrimaryProfile": 457,
+  "hardRejected": 203,
+  "sourceCounts": [
+    {
+      "source_kind": "greenhouse",
+      "sources": 7,
+      "jobs": 390
+    },
+    {
+      "source_kind": "schema_org",
+      "sources": 1,
+      "jobs": 1
+    },
+    {
+      "source_kind": "hrmos",
+      "sources": 3,
+      "jobs": 89
+    },
+    {
+      "source_kind": "herp",
+      "sources": 4,
+      "jobs": 43
+    },
+    {
+      "source_kind": "jobcan",
+      "sources": 1,
+      "jobs": 5
+    },
+    {
+      "source_kind": "airwork",
+      "sources": 10,
+      "jobs": 60
+    },
+    {
+      "source_kind": "engage",
+      "sources": 10,
+      "jobs": 56
+    },
+    {
+      "source_kind": "talentio",
+      "sources": 2,
+      "jobs": 16
+    }
+  ],
+  "eligibleBySource": [
+    {
+      "sourceKind": "greenhouse",
+      "jobs": 222
+    },
+    {
+      "sourceKind": "hrmos",
+      "jobs": 81
+    },
+    {
+      "sourceKind": "airwork",
+      "jobs": 60
+    },
+    {
+      "sourceKind": "engage",
+      "jobs": 44
+    },
+    {
+      "sourceKind": "herp",
+      "jobs": 30
+    },
+    {
+      "sourceKind": "talentio",
+      "jobs": 14
+    },
+    {
+      "sourceKind": "jobcan",
+      "jobs": 5
+    },
+    {
+      "sourceKind": "schema_org",
+      "jobs": 1
+    }
+  ],
+  "parser": {
+    "version": "1.6.0",
+    "succeeded": 660
+  },
+  "evidence": {
+    "non_unknown_facts": 1021,
+    "missing_evidence": 0
+  },
+  "greenhouse": [
+    {
+      "tenantKey": "paypay",
+      "companyName": "PayPay株式会社",
+      "activeJobCount": 87,
+      "japanJobCount": 87,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "paypaycard",
+      "companyName": "PayPayカード株式会社",
+      "activeJobCount": 42,
+      "japanJobCount": 42,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "paypaysec",
+      "companyName": "PayPay証券株式会社",
+      "activeJobCount": 17,
+      "japanJobCount": 17,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "appier",
+      "companyName": "Appier Group, Inc.",
+      "activeJobCount": 83,
+      "japanJobCount": 24,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "knowbe4",
+      "companyName": "KnowBe4, Inc.",
+      "activeJobCount": 94,
+      "japanJobCount": 8,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "marqvision",
+      "companyName": "MarqVision Inc.",
+      "activeJobCount": 29,
+      "japanJobCount": 3,
+      "status": "verified"
+    },
+    {
+      "tenantKey": "glance",
+      "companyName": "Glance",
+      "activeJobCount": 38,
+      "japanJobCount": 12,
+      "status": "verified"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily public ATS Discovery refresh timer
+
+[Timer]
+OnCalendar=*-*-* 05:50:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

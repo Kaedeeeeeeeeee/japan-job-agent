@@ -52,4 +52,12 @@ describe("SchemaOrgConnector", () => {
     const connector = new SchemaOrgConnector(async () => new Response(null, { status: 410 }), async () => ["203.0.113.10"]);
     await expect(connector.fetchRecord(identity, AbortSignal.timeout(1_000))).rejects.toMatchObject({ code: "record_closed" });
   });
+
+  it("treats an explicit past validThrough as closed", async () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", title: "Expired",
+      url: identity.canonicalUrl, validThrough: "2026-06-30T23:59:59+09:00" })}</script>`;
+    const connector = new SchemaOrgConnector(async () => new Response(html, { status: 200 }), async () => ["203.0.113.10"],
+      5 * 1024 * 1024, () => new Date("2026-07-14T00:00:00+09:00"));
+    await expect(connector.fetchRecord(identity, AbortSignal.timeout(1_000))).rejects.toMatchObject({ code: "record_closed" });
+  });
 });

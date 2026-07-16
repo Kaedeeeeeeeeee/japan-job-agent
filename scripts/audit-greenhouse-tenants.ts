@@ -7,6 +7,7 @@ interface Seed {
   officialCareerUrl: string;
   tenantKey: string;
   boardUrl: string;
+  domesticBoard?: boolean;
 }
 
 interface FeedJob {
@@ -40,10 +41,13 @@ async function audit(seed: Seed): Promise<AuditResult> {
   const career = await fetch(seed.officialCareerUrl, { redirect: "follow", signal: AbortSignal.timeout(20_000) });
   if (!career.ok) failures.push(`official career page returned ${career.status}`);
   const finalHost = new URL(career.url).hostname;
-  if (finalHost !== seed.officialDomain) failures.push(`official page redirected to unexpected host ${finalHost}`);
   const careerHtml = await career.text();
   const normalizedBoardUrl = seed.boardUrl.replace(/\/$/, "");
-  const officialLinkVerified = careerHtml.includes(seed.boardUrl) || careerHtml.includes(normalizedBoardUrl);
+  const officialLinkVerified = career.url.startsWith(normalizedBoardUrl)
+    || careerHtml.includes(seed.boardUrl) || careerHtml.includes(normalizedBoardUrl);
+  if (finalHost !== seed.officialDomain && !career.url.startsWith(normalizedBoardUrl)) {
+    failures.push(`official page redirected to unexpected host ${finalHost}`);
+  }
   if (!officialLinkVerified) failures.push(`official page does not link ${seed.boardUrl}`);
 
   const feedUrl = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(seed.tenantKey)}/jobs?content=true`;
@@ -52,7 +56,7 @@ async function audit(seed: Seed): Promise<AuditResult> {
   const payload = await feed.json() as { jobs?: FeedJob[] };
   const jobs = Array.isArray(payload.jobs) ? payload.jobs : [];
   if (jobs.length === 0) failures.push("Greenhouse feed contains no active jobs");
-  const japanJobs = jobs.filter(isJapanJob);
+  const japanJobs = seed.domesticBoard === true ? jobs : jobs.filter(isJapanJob);
   if (japanJobs.length === 0) failures.push("Greenhouse feed contains no job with current Japan evidence");
   const sample = japanJobs[0];
   return {
@@ -68,7 +72,6 @@ async function audit(seed: Seed): Promise<AuditResult> {
 }
 
 function isJapanJob(job: FeedJob): boolean {
-  const evidence = `${job.title}\n${job.location.name}\n${job.content ?? ""}`;
-  return /Japan|Japanese|Tokyo|Fukuoka|日本|東京|福岡|Hybrid/i.test(evidence);
+  const evidence = `${job.title}\n${job.location.name}`;
+  return /Japan|Tokyo|Fukuoka|日本|東京|福岡/i.test(evidence);
 }
-

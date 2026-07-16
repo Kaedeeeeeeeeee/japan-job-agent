@@ -102,6 +102,37 @@ integration("verified Greenhouse full sync", () => {
     expect(count.rows[0]?.count).toBe("1");
   });
 
+  it("does not fetch a public-career detail twice when collection discovery already contains the exact response", async () => {
+    const source: SourceInstanceRef = { id: randomUUID(), sourceKind: "talentio", tenantKey: `exact-${randomUUID()}`,
+      baseUrl: "https://open.talentio.com/r/1/c/exact/homes/1" };
+    await sql`INSERT INTO source_instances(id,source_kind,tenant_key,base_url,verification_state)
+      VALUES (${source.id}::uuid,'talentio',${source.tenantKey},${source.baseUrl},'verified')`.execute(db);
+    await sql`INSERT INTO source_policies(source_instance_id,allows_authoritative_snapshot)
+      VALUES (${source.id}::uuid,true)`.execute(db);
+    let detailFetches = 0;
+    const exactJob: DiscoveredJob = {
+      identity: { sourceInstanceId: source.id, stableKey: "42", externalId: "42",
+        canonicalUrl: "https://open.talentio.com/r/1/c/exact/pages/42" },
+      recordUrl: "https://open.talentio.com/r/1/c/exact/pages/42",
+      raw: new TextEncoder().encode("<html><h1>Engineer</h1><main>Long exact record response for fixture persistence.</main></html>"),
+      response: { requestedUrl: "https://open.talentio.com/r/1/c/exact/pages/42",
+        finalUrl: "https://open.talentio.com/r/1/c/exact/pages/42", status: 200,
+        fetchedAt: "2026-07-15T00:00:00.000Z", contentType: "text/html", etag: null,
+        lastModified: null, requestId: null },
+      exactRecordResponse: true,
+    };
+    const connector: SourceConnector = {
+      kind: "talentio",
+      async fetchCollectionPage() { return { jobs: [exactJob], isLastPage: true, providerTotal: 1,
+        response: exactJob.response }; },
+      async fetchRecord() { detailFetches += 1; return exactJob; },
+    };
+    const result = await new SourceSyncService(db, connector, new MemoryRawObjectStore()).run({ source,
+      idempotencyKey: `exact-${randomUUID()}` });
+    expect(result).toMatchObject({ snapshot: { kind: "authoritative" }, persistedRecords: 1, persistedVersions: 1 });
+    expect(detailFetches).toBe(0);
+  });
+
   it("finishes a forbidden single-record run as failed and only degrades source health", async () => {
     const source: SourceInstanceRef = { id: randomUUID(), sourceKind: "schema_org", tenantKey: `forbidden-${randomUUID()}`, baseUrl: "https://example.com" };
     await sql`INSERT INTO source_instances(id, source_kind, tenant_key, base_url, verification_state)

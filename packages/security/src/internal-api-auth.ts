@@ -8,7 +8,7 @@ export interface InternalApiAuthInput {
 }
 
 export function authorizeInternalApi(input: InternalApiAuthInput): boolean {
-  if (input.path === "/health" || input.path.startsWith("/health?")) return true;
+  if (input.path === "/health" || input.path.startsWith("/health?") || input.path.startsWith("/health/")) return true;
   if (input.configuredToken === undefined || input.configuredToken.length === 0) return !input.production;
   const expected = Buffer.from(`Bearer ${input.configuredToken}`, "utf8");
   const actual = Buffer.from(input.authorization ?? "", "utf8");

@@ -6,6 +6,7 @@ const token = "a-secure-internal-token-with-32-chars";
 describe("internal API authentication", () => {
   it("leaves only health public", () => {
     expect(authorizeInternalApi({ path: "/health", authorization: undefined, configuredToken: token, production: true })).toBe(true);
+    expect(authorizeInternalApi({ path: "/health/ready", authorization: undefined, configuredToken: token, production: true })).toBe(true);
     expect(authorizeInternalApi({ path: "/agent/jobs", authorization: undefined, configuredToken: token, production: true })).toBe(false);
     expect(authorizeInternalApi({ path: "/admin/sources", authorization: `Bearer ${token}`, configuredToken: token, production: true })).toBe(true);
   });

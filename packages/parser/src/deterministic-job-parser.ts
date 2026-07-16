@@ -1,16 +1,27 @@
-import { load } from "cheerio";
 import type {
+  CanonicalDocument,
+  CanonicalDocumentSection,
   EvidenceCandidate,
   ExtractionCandidate,
+  FactUnknownReason,
+  JobDateValue,
   JobParser,
   ParserContext,
   SourceJobVersion,
 } from "../../contracts/src/index.js";
-import { findJobPosting } from "../../connectors-schema-org/src/schema-org-connector.js";
+import { buildCanonicalDocument } from "../../canonical-document/src/canonical-document.js";
+import {
+  normalizeCompensationText,
+  normalizeEmploymentValues,
+  normalizeLanguageFacts,
+  normalizeLocationText,
+  normalizeSkillFacts,
+} from "./job-normalizers.js";
 
 export interface Fact<T> {
   state: "known" | "unknown" | "conflicting";
   values: T[];
+  unknownReason?: FactUnknownReason;
 }
 
 export interface LocationFact {
@@ -58,278 +69,309 @@ export interface ParsedJob extends Record<string, unknown> {
   skills: Fact<SkillFact>;
   compensation: Fact<CompensationFact>;
   experienceRequirements: Fact<ExperienceRequirementFact>;
+  jobDates: {
+    published: Fact<JobDateValue>;
+    sourceUpdated: Fact<JobDateValue>;
+    validThrough: Fact<JobDateValue>;
+  };
 }
 
 export class DeterministicJobParser implements JobParser {
   readonly parserKey = "deterministic-job";
-  readonly parserVersion = "1.3.0";
-  readonly schemaVersion = "job-v1";
+  readonly parserVersion = "1.8.3";
+  readonly schemaVersion = "job-v3";
 
-  async parse(version: SourceJobVersion, _context: ParserContext): Promise<ExtractionCandidate> {
+  async parse(version: SourceJobVersion, context: ParserContext): Promise<ExtractionCandidate> {
     try {
-      const document = sourceDocument(version.raw);
+      return this.parseCanonical(version, context, buildCanonicalDocument(version, context));
+    } catch (error) {
+      return failed(error);
+    }
+  }
+
+  async parseCanonical(
+    version: SourceJobVersion,
+    _context: ParserContext,
+    document: CanonicalDocument,
+  ): Promise<ExtractionCandidate> {
+    try {
       const evidence: EvidenceCandidate[] = [];
-      if (document.title.length > 0) {
-        evidence.push(quote("title", document.title, version.sourceUrl, "source title"));
-      }
-      const employmentTypes = extractEmployment(document, version.sourceUrl, evidence);
-      const visaSupport = extractVisa(document.searchText, version.sourceUrl, evidence);
-      const locations = extractLocations(document, version.sourceUrl, evidence);
-      const languages = extractLanguages(document.searchText, version.sourceUrl, evidence);
-      const skills = extractSkills(document.searchText, version.sourceUrl, evidence);
-      const compensation = extractCompensation(document.searchText, version.sourceUrl, evidence);
-      const experienceRequirements = extractExperienceRequirements(document.searchText, version.sourceUrl, evidence);
+      const titleSection = document.sections.find((section) => section.kind === "title");
+      evidence.push(evidenceCandidate("title", document.title, version.sourceUrl, "canonical title", titleSection));
       const structured: ParsedJob = {
         title: document.title,
-        descriptionText: document.descriptionText,
-        employmentTypes,
-        visaSupport,
-        locations,
-        languages,
-        skills,
-        compensation,
-        experienceRequirements,
+        descriptionText: document.fullText.slice(0, 50_000),
+        employmentTypes: extractEmployment(document, version.sourceUrl, evidence),
+        visaSupport: extractVisa(document, version.sourceUrl, evidence),
+        locations: extractLocations(document, version.sourceUrl, evidence),
+        languages: extractLanguages(document, version.sourceUrl, evidence),
+        skills: extractSkills(document, version.sourceUrl, evidence),
+        compensation: extractCompensation(document, version.sourceUrl, evidence),
+        experienceRequirements: extractExperienceRequirements(document, version.sourceUrl, evidence),
+        jobDates: extractJobDates(document, version.sourceUrl, evidence),
       };
-      return {
-        status: "succeeded",
-        structured,
-        evidence,
-        errors: [],
-      };
+      return { status: "succeeded", structured, evidence, errors: [] };
     } catch (error) {
-      return {
-        status: "failed",
-        structured: {},
-        evidence: [],
-        errors: [error instanceof Error ? error.message : String(error)],
-      };
+      return failed(error);
     }
   }
 }
 
-interface SourceDocument {
-  title: string;
-  descriptionText: string;
-  searchText: string;
-  locationTexts: string[];
-  employmentTexts: string[];
-}
-
-function sourceDocument(raw: Uint8Array): SourceDocument {
-  const input = new TextDecoder().decode(raw);
-  if (input.trimStart().startsWith("{")) {
-    const job = JSON.parse(input) as Record<string, unknown>;
-    return documentFromObject(job);
-  }
-  return documentFromObject(findJobPosting(raw));
-}
-
-function documentFromObject(job: Record<string, unknown>): SourceDocument {
-  const title = text(job.title) ?? "";
-  const descriptionHtml = text(job.description) ?? text(job.content) ?? "";
-  const descriptionText = htmlText(descriptionHtml);
-  const locationTexts = extractLocationTexts(job);
-  const employmentTexts = array(job.employmentType).filter((value): value is string => typeof value === "string");
-  return {
-    title,
-    descriptionText,
-    searchText: [title, ...locationTexts, descriptionText, JSON.stringify(job.baseSalary ?? "")].join("\n"),
-    locationTexts,
-    employmentTexts,
-  };
-}
-
-function htmlText(html: string): string {
-  const $ = load(`<main>${html}</main>`);
-  $("script,style,noscript").remove();
-  $("p,div,li,section,article,h1,h2,h3,h4,h5,h6,br").each((_, element) => {
-    $(element).append(" ");
-  });
-  return $("main").text().replace(/\s+/g, " ").trim();
-}
-
-function extractLocationTexts(job: Record<string, unknown>): string[] {
-  const output: string[] = [];
-  const direct = job.location;
-  if (direct !== null && typeof direct === "object" && "name" in direct && typeof direct.name === "string") output.push(direct.name);
-  for (const location of array(job.jobLocation)) {
-    if (location === null || typeof location !== "object") continue;
-    const address = "address" in location ? location.address : undefined;
-    if (typeof address === "string") output.push(address);
-    if (address !== null && typeof address === "object") {
-      output.push(["addressRegion", "addressLocality", "streetAddress", "addressCountry"]
-        .map((key) => key in address ? text(address[key as keyof typeof address]) : undefined)
-        .filter((value): value is string => value !== undefined).join(" "));
-    }
-  }
-  const remote = text(job.jobLocationType);
-  if (remote !== undefined) output.push(remote);
-  return output.filter((value) => value.length > 0);
-}
-
-function extractEmployment(document: SourceDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<string> {
-  const input = document.searchText;
-  const patterns: Array<[string, RegExp]> = [
-    ["permanent", /正社員|permanent\s+employee|full[- ]time/gi],
-    ["fixed_term", /契約社員|fixed[- ]term|contract\s+employee/gi],
-    ["dispatch", /派遣社員|dispatch\s+worker/gi],
-    ["independent_contractor", /業務委託|independent\s+contractor|freelance/gi],
-    ["part_time", /アルバイト|パートタイム|part[- ]time/gi],
-  ];
+function extractEmployment(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<string> {
+  const sources = document.sections.filter((section) => section.kind === "title" || section.kind === "employment"
+    || /雇用形態|正社員|契約社員|派遣社員|業務委託|full[- ]time|permanent\s+employee/i.test(section.text));
   const values: string[] = [];
-  for (const original of document.employmentTexts) {
-    const normalized = original.toUpperCase();
-    const value = normalized === "FULL_TIME" || /正社員|PERMANENT/.test(normalized) ? "permanent"
-      : normalized === "PART_TIME" || /パート|アルバイト/.test(original) ? "part_time"
-      : normalized === "CONTRACTOR" ? "independent_contractor"
-      : normalized === "TEMPORARY" || /契約社員/.test(original) ? "fixed_term"
-      : null;
-    if (value !== null && !values.includes(value)) {
+  for (const section of sources) {
+    for (const value of normalizeEmploymentValues(section.text)) {
+      if (values.includes(value)) continue;
       values.push(value);
-      evidence.push(quote("employmentTypes", original, sourceUrl, "schema.org employmentType"));
+      evidence.push(evidenceCandidate("employmentTypes", employmentQuote(section.text, value), sourceUrl,
+        "employment normalizer", section));
     }
   }
-  for (const [value, pattern] of patterns) {
-    const match = pattern.exec(input);
-    pattern.lastIndex = 0;
-    if (match === null) continue;
-    const context = input.slice(Math.max(0, match.index - 40), match.index + match[0].length + 40);
-    if (!/雇用形態|雇用区分|契約区分|employment\s+type/i.test(context)) continue;
-    if (!values.includes(value)) values.push(value);
-    evidence.push(quote("employmentTypes", match[0], sourceUrl, pattern.source));
-  }
-  return fact(values);
+  return fact(values, sources.some((section) => section.kind === "employment") ? "not_parsed" : "not_mentioned");
 }
 
-function extractVisa(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<boolean> {
-  const positive = /(visa\s+(sponsorship|support)(\s+(is\s+)?available)?|ビザ.{0,12}(支援|サポート)|在留資格.{0,18}(取得|変更|更新).{0,12}(支援|可能))/gi;
-  const negative = /(no\s+visa\s+(sponsorship|support)|visa\s+(sponsorship|support)\s+(is\s+)?not\s+available|ビザ.{0,12}(支援|サポート).{0,10}(なし|不可)|在留資格.{0,18}(支援不可|対象外))/gi;
-  const positiveMatch = positive.exec(input);
-  const negativeMatch = negative.exec(input);
-  const values: boolean[] = [];
-  if (positiveMatch !== null) {
-    values.push(true);
-    evidence.push(quote("visaSupport", positiveMatch[0], sourceUrl, positive.source));
+function extractLocations(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LocationFact> {
+  const sections = document.sections.filter((section) => section.kind === "location");
+  const values: LocationFact[] = [];
+  for (const section of sections) {
+    const value = normalizeLocationText(section.text);
+    if (value === null || values.some((candidate) => stableJson(candidate) === stableJson(value))) continue;
+    values.push(value);
+    evidence.push(evidenceCandidate("locations", conciseQuote(section.text, 500), sourceUrl, "location normalizer", section));
   }
-  if (negativeMatch !== null) {
-    values.push(false);
-    evidence.push(quote("visaSupport", negativeMatch[0], sourceUrl, negative.source));
-  }
-  if (values.length === 0) return { state: "unknown", values: [] };
-  return { state: new Set(values).size > 1 ? "conflicting" : "known", values: [...new Set(values)] };
+  const reason: FactUnknownReason = sections.length > 0 || /勤務地|勤務場所|就業場所|住所|location/i.test(document.fullText)
+    ? "not_parsed" : "not_mentioned";
+  const compact = values.filter((value, index) => !values.some((candidate, candidateIndex) => candidateIndex !== index
+    && candidate.countryCode === value.countryCode && candidate.prefecture === value.prefecture && candidate.city === value.city
+    && candidate.remoteScope === value.remoteScope && value.addressText.includes(candidate.addressText)
+    && candidate.addressText.length < value.addressText.length));
+  return fact(compact, reason);
 }
 
-function extractLocations(document: SourceDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LocationFact> {
-  const locations: LocationFact[] = [];
-  for (const original of document.locationTexts) {
-    const japan = /Japan|日本|Tokyo|東京|Fukuoka|福岡|Osaka|大阪/i.test(original);
-    const remote = /remote|リモート|在宅|telecommute/i.test(original);
-    locations.push({
-      countryCode: japan ? "JP" : null,
-      prefecture: /Tokyo|東京/i.test(original) ? "東京都" : /Fukuoka|福岡/i.test(original) ? "福岡県" : /Osaka|大阪/i.test(original) ? "大阪府" : null,
-      city: null,
-      addressText: original,
-      remoteScope: remote ? (japan ? "japan" : "unspecified") : null,
-    });
-    evidence.push(quote("locations", original, sourceUrl, "structured location"));
+function extractCompensation(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<CompensationFact> {
+  const sections = document.sections.filter((section) => section.kind === "compensation"
+    || /年収|年俸|月給|基本給|日給|時給|salary|compensation|[￥¥]\s*\d+\s*K/i.test(section.text));
+  const values: CompensationFact[] = [];
+  for (const section of sections) {
+    for (const value of normalizeCompensationText(section.text)) {
+      if (values.some((candidate) => stableJson(candidate) === stableJson(value))) continue;
+      values.push(value);
+      evidence.push(evidenceCandidate("compensation", compensationQuote(section.text), sourceUrl,
+        "compensation normalizer", section));
+    }
   }
-  return fact(locations);
+  const reason: FactUnknownReason = sections.length > 0 || /年収|月給|時給|給与|salary|compensation/i.test(document.fullText)
+    ? "unsupported_format" : "not_mentioned";
+  return fact(values, reason);
 }
 
-function extractLanguages(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LanguageFact> {
-  const results: LanguageFact[] = [];
-  const patterns: Array<[string, RegExp]> = [
-    ["ja", /(JLPT\s*N[1-5]|日本語.{0,16}(ネイティブ|ビジネス|日常会話|N[1-5]))/gi],
-    ["en", /(TOEIC\s*\d{3,4}|英語.{0,16}(ネイティブ|ビジネス|日常会話))/gi],
-    ["zh", /(中国語.{0,16}(ネイティブ|ビジネス|日常会話)|Mandarin|Chinese)/gi],
-  ];
-  for (const [languageCode, pattern] of patterns) {
-    const match = pattern.exec(input);
-    if (match === null) continue;
-    const preferredWindow = input.slice(Math.max(0, match.index - 20), match.index + match[0].length + 20);
-    results.push({
-      languageCode,
-      minimumLevel: match[0].match(/N[1-5]|\d{3,4}|ネイティブ|ビジネス|日常会話/i)?.[0] ?? null,
-      requirementKind: /歓迎|preferred|nice to have/i.test(preferredWindow) ? "preferred" : "required",
-    });
-    evidence.push(quote("languages", match[0], sourceUrl, pattern.source));
+function extractSkills(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<SkillFact> {
+  const explicit = document.sections.filter((section) => ["skills", "required_requirements", "preferred_requirements"].includes(section.kind));
+  const sources = explicit.length > 0 ? explicit : document.sections.filter((section) => hasSkillSignal(section.text));
+  const values: SkillFact[] = [];
+  for (const section of sources) {
+    const requirementKind = section.kind === "preferred_requirements" ? "preferred"
+      : section.kind === "required_requirements" ? "required" : "mentioned";
+    for (const value of normalizeSkillFacts(section.text, requirementKind)) {
+      if (values.some((candidate) => candidate.normalizedSkill === value.normalizedSkill
+        && candidate.requirementKind === value.requirementKind)) continue;
+      values.push(value);
+      evidence.push(evidenceCandidate("skills", value.originalText, sourceUrl, "skill dictionary", section));
+    }
   }
-  return fact(results);
+  return fact(preferStrongestRequirement(values, (value) => value.normalizedSkill), sources.length > 0 ? "not_parsed" : "not_mentioned");
 }
 
-function extractSkills(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<SkillFact> {
-  const dictionary = ["TypeScript", "JavaScript", "React", "Next.js", "Node.js", "Python", "Java", "Go", "AWS", "GCP", "Docker", "Kubernetes", "PostgreSQL", "AI", "LLM", "iOS", "Swift", "Unity"];
-  const results: SkillFact[] = [];
-  for (const skill of dictionary) {
-    const pattern = new RegExp(`\\b${escapeRegExp(skill).replaceAll("\\.", "\\.?")}\\b`, "i");
-    const match = pattern.exec(input);
-    if (match === null) continue;
-    results.push({ normalizedSkill: skill.toLowerCase(), originalText: match[0], requirementKind: "mentioned" });
-    evidence.push(quote("skills", match[0], sourceUrl, pattern.source));
+function extractLanguages(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<LanguageFact> {
+  const explicit = document.sections.filter((section) => ["languages", "required_requirements", "preferred_requirements"].includes(section.kind));
+  const sources = explicit.length > 0 ? explicit : document.sections.filter((section) => /JLPT|TOEIC|日本語|英語|Japanese|English/i.test(section.text));
+  const values: LanguageFact[] = [];
+  for (const section of sources) {
+    const requirementKind = section.kind === "preferred_requirements" ? "preferred"
+      : section.kind === "required_requirements" || section.kind === "languages" ? "required" : "mentioned";
+    for (const value of normalizeLanguageFacts(section.text, requirementKind)) {
+      if (values.some((candidate) => stableJson(candidate) === stableJson(value))) continue;
+      values.push(value);
+      evidence.push(evidenceCandidate("languages", languageQuote(section.text, value.languageCode), sourceUrl,
+        "language normalizer", section));
+    }
   }
-  return fact(results);
+  return fact(preferStrongestRequirement(values, (value) => `${value.languageCode}:${value.minimumLevel ?? ""}`),
+    sources.length > 0 ? "not_parsed" : "not_mentioned");
 }
 
-function extractCompensation(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<CompensationFact> {
-  const range = /(?:年収|想定年収)?\s*(\d{3,4})\s*万円?\s*(?:[〜～~-]|から)\s*(\d{3,4})\s*万円?/i.exec(input);
-  if (range?.[1] !== undefined && range[2] !== undefined) {
-    evidence.push(quote("compensation", range[0], sourceUrl, "jpy annual range"));
-    return {
-      state: "known",
-      values: [{
-        compensationKind: /試用期間/.test(input.slice(Math.max(0, range.index - 30), range.index + range[0].length + 10)) ? "trial" : "total",
-        currency: "JPY", period: "year", minimumAmount: Number(range[1]) * 10_000,
-        maximumAmount: Number(range[2]) * 10_000, isCalculated: false,
-      }],
-    };
-  }
-  const monthly = /(?:月給|初任給)[：:\s]*(\d{2,3}(?:,\d{3})?)\s*円/i.exec(input);
-  if (monthly?.[1] === undefined) return { state: "unknown", values: [] };
-  evidence.push(quote("compensation", monthly[0], sourceUrl, "jpy monthly amount"));
-  const amount = Number(monthly[1].replaceAll(",", ""));
-  return { state: "known", values: [{ compensationKind: "base", currency: "JPY", period: "month",
-    minimumAmount: amount, maximumAmount: amount, isCalculated: false }] };
-}
-
-function extractExperienceRequirements(input: string, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<ExperienceRequirementFact> {
-  const results: ExperienceRequirementFact[] = [];
+function extractExperienceRequirements(
+  document: CanonicalDocument,
+  sourceUrl: string,
+  evidence: EvidenceCandidate[],
+): Fact<ExperienceRequirementFact> {
+  const sources = document.sections.filter((section) => ["experience", "required_requirements", "preferred_requirements"].includes(section.kind)
+    || /(?:実務経験|開発経験|業務経験|エンジニア経験).{0,24}\d{1,2}\s*年|\d{1,2}\+?\s+years?.{0,36}experience/i.test(section.text));
+  const values: ExperienceRequirementFact[] = [];
   const patterns = [
     /(?:実務経験|開発経験|業務経験|エンジニア経験)[^。\n]{0,24}?(\d{1,2})\s*年(?:以上|超)/gi,
     /(?:at\s+least\s+)?(\d{1,2})\+?\s+years?[^.\n]{0,36}(?:experience|professional)/gi,
   ];
-  for (const pattern of patterns) {
-    for (const match of input.matchAll(pattern)) {
-      const years = Number(match[1]);
-      if (!Number.isInteger(years) || years < 1 || years > 30) continue;
-      const originalText = match[0];
-      const index = match.index ?? 0;
-      const window = input.slice(Math.max(0, index - 20), index + originalText.length + 20);
-      results.push({ minimumYears: years, originalText,
-        requirementKind: /歓迎|尚可|preferred|nice to have/i.test(window) ? "preferred" : "required" });
-      evidence.push(quote("experienceRequirements", originalText, sourceUrl, pattern.source));
+  for (const section of sources) {
+    for (const pattern of patterns) {
+      for (const match of section.text.matchAll(pattern)) {
+        const years = Number(match[1]);
+        if (!Number.isInteger(years) || years < 1 || years > 30) continue;
+        const value: ExperienceRequirementFact = {
+          minimumYears: years,
+          originalText: match[0],
+          requirementKind: section.kind === "preferred_requirements" ? "preferred" : "required",
+        };
+        if (values.some((candidate) => candidate.minimumYears === value.minimumYears
+          && candidate.requirementKind === value.requirementKind)) continue;
+        values.push(value);
+        evidence.push(evidenceCandidate("experienceRequirements", value.originalText, sourceUrl,
+          "experience normalizer", section));
+      }
     }
   }
-  const unique = results.filter((value, index) => results.findIndex((candidate) => candidate.minimumYears === value.minimumYears
-    && candidate.requirementKind === value.requirementKind) === index);
-  return fact(unique);
+  return fact(values, sources.length > 0 ? "not_parsed" : "not_mentioned");
 }
 
-function fact<T>(values: T[]): Fact<T> {
-  return values.length === 0 ? { state: "unknown", values: [] } : { state: "known", values };
+function extractVisa(document: CanonicalDocument, sourceUrl: string, evidence: EvidenceCandidate[]): Fact<boolean> {
+  const positive = /(visa\s+(sponsorship|support)(\s+(is\s+)?available)?|ビザ.{0,12}(支援|サポート)|在留資格.{0,18}(取得|変更|更新).{0,12}(支援|可能))/gi;
+  const negative = /(no\s+visa\s+(sponsorship|support)|visa\s+(sponsorship|support)\s+(is\s+)?not\s+available|ビザ.{0,12}(支援|サポート).{0,10}(なし|不可)|在留資格.{0,18}(支援不可|対象外))/gi;
+  const values: boolean[] = [];
+  for (const [value, pattern] of [[true, positive], [false, negative]] as const) {
+    const match = pattern.exec(document.fullText);
+    pattern.lastIndex = 0;
+    if (match === null) continue;
+    values.push(value);
+    evidence.push(evidenceCandidate("visaSupport", match[0], sourceUrl, "visa rule", findSection(document, match[0])));
+  }
+  const uniqueValues = [...new Set(values)];
+  if (uniqueValues.length === 0) return unknown("not_mentioned");
+  return { state: uniqueValues.length > 1 ? "conflicting" : "known", values: uniqueValues };
 }
 
-function quote(fieldPath: string, quotedText: string, sourceUrl: string, rule: string): EvidenceCandidate {
-  return { fieldPath, quotedText, sourceUrl, locator: { kind: "deterministic_rule", rule } };
+function extractJobDates(
+  document: CanonicalDocument,
+  sourceUrl: string,
+  evidence: EvidenceCandidate[],
+): ParsedJob["jobDates"] {
+  const dateSections = document.sections.filter((section) => section.kind === "dates");
+  return {
+    published: datesFor("jobDates.published", dateSections.filter((section) => /掲載|公開|投稿日|published|released|dateposted/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
+    sourceUpdated: datesFor("jobDates.sourceUpdated", dateSections.filter((section) => /更新|modified|updated/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
+    validThrough: datesFor("jobDates.validThrough", dateSections.filter((section) => /締切|期限|valid|expire/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
+  };
 }
 
-function array(value: unknown): unknown[] {
-  return value === undefined ? [] : Array.isArray(value) ? value : [value];
+function datesFor(fieldPath: string, sections: CanonicalDocumentSection[], sourceUrl: string,
+  evidence: EvidenceCandidate[]): Fact<JobDateValue> {
+  const values: JobDateValue[] = [];
+  for (const section of sections) {
+    const rawValues = section.text.match(/\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T ][0-9:.+Z-]+)?/g) ?? [];
+    for (const raw of rawValues) {
+      const parsed = parseJobDate(raw);
+      if (parsed === null || values.some((value) => stableJson(value) === stableJson(parsed))) continue;
+      values.push(parsed);
+      evidence.push(evidenceCandidate(fieldPath, raw, sourceUrl, "date normalizer", section));
+    }
+  }
+  if (values.length === 0) return unknown(sections.length > 0 ? "unsupported_format" : "not_mentioned");
+  return { state: values.length > 1 ? "conflicting" : "known", values };
 }
 
-function text(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+function parseJobDate(input: string): JobDateValue | null {
+  const normalizedDate = input.trim().replaceAll("/", "-");
+  const dateOnly = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(normalizedDate);
+  if (dateOnly?.[1] !== undefined && dateOnly[2] !== undefined && dateOnly[3] !== undefined) {
+    const value = `${dateOnly[1]}-${dateOnly[2].padStart(2, "0")}-${dateOnly[3].padStart(2, "0")}`;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? { value, precision: "date" } : null;
+  }
+  const timestamp = Date.parse(input);
+  return Number.isFinite(timestamp) ? { value: new Date(timestamp).toISOString(), precision: "datetime" } : null;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function fact<T>(values: T[], reason: FactUnknownReason): Fact<T> {
+  return values.length === 0 ? unknown(reason) : { state: "known", values };
+}
+
+function unknown<T>(unknownReason: FactUnknownReason): Fact<T> {
+  return { state: "unknown", values: [], unknownReason };
+}
+
+function evidenceCandidate(fieldPath: string, quotedText: string, sourceUrl: string, rule: string,
+  section?: CanonicalDocumentSection): EvidenceCandidate {
+  return {
+    fieldPath,
+    quotedText: conciseQuote(quotedText, 1_500),
+    sourceUrl,
+    locator: {
+      ...(section?.locator ?? { kind: "canonical_document" }),
+      ...(section?.id === undefined ? {} : { sectionId: section.id }),
+      ...(section === undefined ? {} : { sectionOrdinal: section.ordinal }),
+      rule,
+    },
+  };
+}
+
+function findSection(document: CanonicalDocument, quote: string): CanonicalDocumentSection | undefined {
+  return document.sections.find((section) => section.text.includes(quote));
+}
+
+function employmentQuote(text: string, normalized: string): string {
+  const patterns: Record<string, RegExp> = {
+    permanent: /【?正社員】?|正規社員|permanent\s+employee|full[- ]time/i,
+    fixed_term: /契約社員|有期雇用|fixed[- ]term|contract\s+employee/i,
+    dispatch: /派遣社員|dispatch\s+worker/i,
+    independent_contractor: /業務委託|請負|independent\s+contractor|freelance/i,
+    part_time: /アルバイト|パート|part[- ]time/i,
+    ses_on_site: /SES常駐|客先常駐/i,
+  };
+  return patterns[normalized]?.exec(text)?.[0] ?? conciseQuote(text, 240);
+}
+
+function compensationQuote(text: string): string {
+  return text.match(/(?:年収|年俸|月給|基本給|日給|時給|salary|compensation)[^\n。]{0,120}/i)?.[0]
+    ?? conciseQuote(text, 240);
+}
+
+function languageQuote(text: string, language: string): string {
+  const pattern = language === "ja" ? /[^\n。]{0,30}(?:JLPT|日本語|Japanese)[^\n。]{0,50}/i
+    : language === "en" ? /[^\n。]{0,30}(?:TOEIC|英語|English)[^\n。]{0,50}/i
+      : /[^\n。]{0,30}(?:中国語|Mandarin|Chinese)[^\n。]{0,50}/i;
+  return pattern.exec(text)?.[0] ?? conciseQuote(text, 240);
+}
+
+function hasSkillSignal(text: string): boolean {
+  return /TypeScript|JavaScript|React|Python|Java|AWS|Excel|Word|PowerPoint|VBA|スキル/i.test(text);
+}
+
+function preferStrongestRequirement<T extends { requirementKind: "required" | "preferred" | "mentioned" }>(
+  values: T[],
+  key: (value: T) => string,
+): T[] {
+  const weight = { required: 3, preferred: 2, mentioned: 1 } as const;
+  const selected = new Map<string, T>();
+  for (const value of values) {
+    const current = selected.get(key(value));
+    if (current === undefined || weight[value.requirementKind] > weight[current.requirementKind]) selected.set(key(value), value);
+  }
+  return [...selected.values()];
+}
+
+function conciseQuote(value: string, maximum: number): string {
+  const cleaned = value.trim();
+  return cleaned.length <= maximum ? cleaned : cleaned.slice(0, maximum);
+}
+
+function failed(error: unknown): ExtractionCandidate {
+  return { status: "failed", structured: {}, evidence: [], errors: [error instanceof Error ? error.message : String(error)] };
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(",")}}`;
+  return JSON.stringify(value);
 }

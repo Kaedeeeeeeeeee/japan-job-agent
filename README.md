@@ -101,8 +101,25 @@ DATABASE_URL=... pnpm acceptance:verify
 pnpm deploy:preflight -- web
 ```
 
-Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. Production preflight validates one of `api`, `web`, `worker`, `backup`, or `temporal` without printing values. See the [Railway deployment runbook](./deploy/railway/README.md) and [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
+Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. Production preflight validates one of `api`, `web`, `worker`, `backup`, or `temporal` without printing values. The default private deployment is the [Linux + Tailscale runbook](./deploy/linux/README.md): PostgreSQL and raw objects stay on local disk, while GitHub Actions reaches only the readiness endpoint through an ephemeral tagged Tailscale identity. The [Railway deployment runbook](./deploy/railway/README.md) remains available as an alternative; see also the [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
 
 ## Company seed audit
 
 `config/company-seeds.json` tracks all 16 requested companies. `pnpm source:seed-company-audits` persists verified official relationships and discovery states. Manual sources prove only the official company/recruiting relationship: they do not fabricate job records, enter recommendations, or participate in collection-missing closure.
+
+## 10,000-job source expansion
+
+Discovery directories are isolated from recommendation-eligible jobs. JETRO OFP entries create auditable company candidates and company-level foreign-talent signals; they cannot create job records or be promoted to job-level visa facts.
+
+```bash
+DATABASE_URL=... pnpm discovery:jetro-ofp
+pnpm discovery:audit-details
+pnpm discovery:audit-entrypoints
+pnpm discovery:audit-candidates
+DATABASE_URL=... pnpm discovery:promote
+DATABASE_URL=... pnpm discovery:report
+DATABASE_URL=... pnpm corpus:report
+DATABASE_URL=... pnpm sync:hrmos -- verified-tenant-key
+```
+
+HRMOS, HERP, Jobcan, AirWork, engage, and Talentio are complete-collection connectors: they fetch every detail body before the Orchestrator may finalize an authoritative snapshot. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. Global Greenhouse boards retain complete snapshots while explicit overseas locations are deterministically excluded from recommendations. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md), [JETRO promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md), and [expanded corpus report](./docs/delivery/job-corpus-expansion-2026-07-14.md).

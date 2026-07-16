@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql, type Kysely, type Transaction } from "kysely";
+import type { SourceKind } from "../../contracts/src/index.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
 import { normalizeApplicationUrl } from "./normalize-application-url.js";
 
@@ -8,7 +9,7 @@ interface InputRow {
   structured_result: Record<string, unknown>;
   source_job_record_id: string;
   source_instance_id: string;
-  source_kind: "greenhouse" | "schema_org" | "manual";
+  source_kind: SourceKind;
   canonical_url: string;
   normalized_application_url: string | null;
   external_id: string | null;
@@ -20,6 +21,7 @@ interface ActiveInput {
   extraction_id: string;
   structured_result: Record<string, unknown>;
   canonical_url: string;
+  extraction_origin: "deterministic" | "hybrid" | "manual";
 }
 
 export interface MaterializationResult {
@@ -30,7 +32,10 @@ export interface MaterializationResult {
 }
 
 export class CanonicalService {
-  constructor(private readonly db: Kysely<OutboxDatabase>) {}
+  constructor(
+    private readonly db: Kysely<OutboxDatabase>,
+    private readonly options: { enrichmentEnabled?: boolean } = {},
+  ) {}
 
   async materialize(
     extractionId: string,
@@ -95,22 +100,28 @@ export class CanonicalService {
     if (primary === undefined) throw new Error(`Canonical ${canonicalJobId} has no active primary`);
     const structured = mergeStructured(primary, activeInputs.filter((item) => item !== primary));
     const applicationUrl = primary.canonical_url;
+    const readiness = determineReadiness(structured, primary.extraction_origin,
+      this.options.enrichmentEnabled ?? process.env.AI_ENRICHMENT_ENABLED === "true");
     const contentHash = createHash("sha256").update(stableJson({
-      version: "canonical-v2", applicationUrl, structured,
+      version: "canonical-v3", applicationUrl, structured, readiness,
       inputs: activeInputs.map((value) => ({ extractionId: value.extraction_id, role: value.source_role })),
     })).digest("hex");
     const versionId = randomUUID();
     const inserted = await sql<{ id: string }>`INSERT INTO canonical_job_versions(
-        id, canonical_job_id, materialization_version, title, application_url, structured_result, content_hash
-      ) VALUES (${versionId}::uuid, ${canonicalJobId}::uuid, 'canonical-v2',
+        id, canonical_job_id, materialization_version, title, application_url, structured_result, content_hash,
+        readiness,readiness_reasons
+      ) VALUES (${versionId}::uuid, ${canonicalJobId}::uuid, 'canonical-v3',
       ${typeof structured.title === "string" ? structured.title : "Untitled"}, ${applicationUrl},
-      ${JSON.stringify(structured)}::jsonb, ${contentHash})
+      ${JSON.stringify(structured)}::jsonb, ${contentHash},${readiness.state}::job_readiness,${readiness.reasons}::text[])
       ON CONFLICT (canonical_job_id, content_hash) DO NOTHING RETURNING id`.execute(this.db);
     const versionCreated = inserted.rows[0] !== undefined;
     const canonicalJobVersionId = inserted.rows[0]?.id ?? (await sql<{ id: string }>`SELECT id FROM canonical_job_versions
       WHERE canonical_job_id=${canonicalJobId}::uuid AND content_hash=${contentHash}`.execute(this.db)).rows[0]?.id;
     if (canonicalJobVersionId === undefined) throw new Error("Canonical version disappeared");
-    if (versionCreated) await this.persistVersionInputs(canonicalJobId, canonicalJobVersionId, activeInputs);
+    if (versionCreated) await this.persistVersionInputs(canonicalJobId, canonicalJobVersionId, activeInputs, structured);
+    if (readiness.state === "needs_review" && primary.extraction_origin === "deterministic") {
+      await this.ensureDeterministicReviewTasks(primary.extraction_id, structured);
+    }
     return { canonicalJobId, canonicalJobVersionId, mergedBy, versionCreated };
   }
 
@@ -132,17 +143,16 @@ export class CanonicalService {
         VALUES (${current.canonical_job_id}::uuid, ${sourceJobRecordId}::uuid, 'unmerge', 'manual_review',
         ${JSON.stringify({ reason, newCanonicalJobId })}::jsonb)`.execute(trx);
     });
-    const latest = await sql<{ id: string }>`SELECT e.id FROM source_job_extractions e JOIN source_job_versions v ON v.id=e.source_job_version_id
-      WHERE v.source_job_record_id=${sourceJobRecordId}::uuid AND e.status='succeeded' ORDER BY e.completed_at DESC LIMIT 1`.execute(this.db);
+    const latest = await sql<{ id: string }>`SELECT h.extraction_id id FROM source_job_extraction_heads h
+      WHERE h.source_job_record_id=${sourceJobRecordId}::uuid`.execute(this.db);
     const extractionId = latest.rows[0]?.id;
     if (extractionId === undefined) throw new Error("Unmerged source has no successful extraction");
     await this.materialize(extractionId);
     if (oldCanonicalJobId !== undefined) {
-      const remaining = await sql<{ id: string }>`SELECT e.id FROM canonical_job_sources cjs
-        JOIN source_job_versions v ON v.source_job_record_id=cjs.source_job_record_id
-        JOIN source_job_extractions e ON e.source_job_version_id=v.id
-        WHERE cjs.canonical_job_id=${oldCanonicalJobId}::uuid AND cjs.active_to IS NULL AND e.status='succeeded'
-        ORDER BY e.completed_at DESC LIMIT 1`.execute(this.db);
+      const remaining = await sql<{ id: string }>`SELECT h.extraction_id id FROM canonical_job_sources cjs
+        JOIN source_job_extraction_heads h ON h.source_job_record_id=cjs.source_job_record_id
+        WHERE cjs.canonical_job_id=${oldCanonicalJobId}::uuid AND cjs.active_to IS NULL
+        ORDER BY cjs.source_role DESC,cjs.active_from LIMIT 1`.execute(this.db);
       const remainingExtractionId = remaining.rows[0]?.id;
       if (remainingExtractionId !== undefined) await this.materialize(remainingExtractionId);
       else await this.refreshCanonicalLifecycle(oldCanonicalJobId);
@@ -162,11 +172,12 @@ export class CanonicalService {
   }
 
   private async loadActiveInputs(canonicalJobId: string): Promise<ActiveInput[]> {
-    const result = await sql<ActiveInput>`SELECT cjs.source_job_record_id, cjs.source_role, x.extraction_id, x.structured_result,
-      r.canonical_url FROM canonical_job_sources cjs JOIN source_job_records r ON r.id=cjs.source_job_record_id
-      JOIN LATERAL (SELECT e.id extraction_id,e.structured_result FROM source_job_versions v
-        JOIN source_job_extractions e ON e.source_job_version_id=v.id WHERE v.source_job_record_id=r.id
-        AND e.status='succeeded' ORDER BY e.completed_at DESC LIMIT 1) x ON true
+    const result = await sql<ActiveInput>`SELECT cjs.source_job_record_id,cjs.source_role,e.id extraction_id,e.structured_result,
+      r.canonical_url,lineage.origin extraction_origin
+      FROM canonical_job_sources cjs JOIN source_job_records r ON r.id=cjs.source_job_record_id
+      JOIN source_job_extraction_heads head ON head.source_job_record_id=r.id
+      JOIN source_job_extractions e ON e.id=head.extraction_id
+      JOIN source_job_extraction_lineage lineage ON lineage.extraction_id=e.id
       WHERE cjs.canonical_job_id=${canonicalJobId}::uuid AND cjs.active_to IS NULL ORDER BY cjs.source_role DESC`.execute(this.db);
     return result.rows;
   }
@@ -188,7 +199,12 @@ export class CanonicalService {
       ${JSON.stringify({ from: primary.source_kind, to: input.source_kind })}::jsonb)`.execute(trx);
   }
 
-  private async persistVersionInputs(canonicalJobId: string, versionId: string, inputs: ActiveInput[]): Promise<void> {
+  private async persistVersionInputs(
+    canonicalJobId: string,
+    versionId: string,
+    inputs: ActiveInput[],
+    structured: Record<string, unknown>,
+  ): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
       for (const input of inputs) {
         await sql`INSERT INTO canonical_materialization_inputs(canonical_job_version_id, source_job_extraction_id, input_role)
@@ -204,6 +220,22 @@ export class CanonicalService {
           JOIN evidence e ON e.company_source_relationship_id=csr.id
           WHERE r.id=${input.source_job_record_id}::uuid
           ON CONFLICT DO NOTHING`.execute(trx);
+        await sql`INSERT INTO canonical_job_dates(
+            canonical_job_version_id, date_kind, precision, date_value, timestamp_value, source_role, evidence_id
+          ) SELECT ${versionId}::uuid, d.date_kind, d.precision, d.date_value, d.timestamp_value,
+            ${input.source_role}, d.evidence_id
+          FROM extraction_job_dates d WHERE d.extraction_id=${input.extraction_id}::uuid
+          ON CONFLICT DO NOTHING`.execute(trx);
+      }
+      const jobDates = structured.jobDates;
+      for (const [kind, field] of [
+        ["published", "published"],
+        ["source_updated", "sourceUpdated"],
+        ["valid_through", "validThrough"],
+      ] as const) {
+        const state = factState(jobDates, field);
+        await sql`INSERT INTO canonical_job_date_states(canonical_job_version_id, date_kind, value_state)
+          VALUES (${versionId}::uuid, ${kind}::job_date_kind, ${state}::explicit_value_state)`.execute(trx);
       }
       await sql`UPDATE canonical_jobs SET current_version_id=${versionId}::uuid, updated_at=now(), lifecycle_state=CASE WHEN EXISTS(
         SELECT 1 FROM canonical_job_sources cjs JOIN source_job_records r ON r.id=cjs.source_job_record_id
@@ -213,6 +245,27 @@ export class CanonicalService {
         VALUES ('canonical_job_version', ${versionId}::uuid, 'canonical_job.materialized', ${JSON.stringify({ canonicalJobId, versionId })}::jsonb,
         ${`canonical-materialized:${versionId}`})`.execute(trx);
     });
+  }
+
+  private async ensureDeterministicReviewTasks(
+    extractionId: string,
+    structured: Record<string, unknown>,
+  ): Promise<void> {
+    for (const field of ["employmentTypes", "locations"] as const) {
+      const fact = isFact(structured[field]) ? structured[field] : { state: "unknown", values: [] };
+      if (fact.state === "known") continue;
+      const reason = fact.state === "unknown" && typeof fact.unknownReason === "string"
+        && ["not_mentioned", "not_parsed", "unsupported_format", "low_confidence", "provider_failed"].includes(fact.unknownReason)
+        ? fact.unknownReason : "low_confidence";
+      const idempotencyKey = createHash("sha256").update(stableJson({ extractionId, field, reason,
+        source: "deterministic_readiness" })).digest("hex");
+      await sql`INSERT INTO field_review_tasks(
+          source_job_version_id,extraction_id,field_name,reason,candidate_quotes,idempotency_key
+        ) SELECT extraction.source_job_version_id,extraction.id,${field},${reason}::fact_unknown_reason,'[]'::jsonb,
+          ${idempotencyKey}
+        FROM source_job_extractions extraction WHERE extraction.id=${extractionId}::uuid
+        ON CONFLICT(idempotency_key) DO NOTHING`.execute(this.db);
+    }
   }
 
   private async refreshCanonicalLifecycle(canonicalJobId: string): Promise<void> {
@@ -246,7 +299,9 @@ async function promoteAnySupporting(trx: Transaction<OutboxDatabase>, canonicalI
 }
 
 function priority(kind: InputRow["source_kind"]): number {
-  return kind === "greenhouse" ? 300 : kind === "schema_org" ? 200 : 100;
+  if (["greenhouse", "smartrecruiters", "lever", "ashby", "workday"].includes(kind)) return 300;
+  if (["schema_org", "hrmos", "herp", "jobcan", "airwork", "engage", "talentio"].includes(kind)) return 200;
+  return 100;
 }
 
 function mergeStructured(primary: ActiveInput, supporting: ActiveInput[]): Record<string, unknown> {
@@ -256,7 +311,7 @@ function mergeStructured(primary: ActiveInput, supporting: ActiveInput[]): Recor
     const facts = [primary, ...supporting].map((input) => input.structured_result[field]).filter(isFact);
     const nonUnknown = facts.filter((fact) => fact.state !== "unknown");
     if (nonUnknown.length === 0) {
-      result[field] = { state: "unknown", values: [] };
+      result[field] = { state: "unknown", values: [], unknownReason: strongestUnknownReason(facts) };
       continue;
     }
     const values = uniqueValues(nonUnknown.flatMap((fact) => fact.values));
@@ -266,12 +321,75 @@ function mergeStructured(primary: ActiveInput, supporting: ActiveInput[]): Recor
     result[field] = { state: sourceConflict ? "conflicting" : "known", values };
     if (sourceConflict) conflicts.push(field);
   }
+  result.jobDates = mergeJobDates(primary, supporting, conflicts);
   result.sourceConflicts = conflicts;
   return result;
 }
 
-function isFact(value: unknown): value is { state: string; values: unknown[] } {
+function mergeJobDates(
+  primary: ActiveInput,
+  supporting: ActiveInput[],
+  conflicts: string[],
+): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  for (const field of ["published", "sourceUpdated", "validThrough"] as const) {
+    const facts = [primary, ...supporting]
+      .map((input) => nestedDateFact(input.structured_result, field))
+      .filter((fact): fact is { state: string; values: unknown[] } => fact !== null);
+    const nonUnknown = facts.filter((fact) => fact.state !== "unknown");
+    if (nonUnknown.length === 0) {
+      output[field] = { state: "unknown", values: [], unknownReason: strongestUnknownReason(facts) };
+      continue;
+    }
+    const values = uniqueValues(nonUnknown.flatMap((fact) => fact.values));
+    const conflict = nonUnknown.some((fact) => fact.state === "conflicting") || values.length > 1;
+    output[field] = { state: conflict ? "conflicting" : "known", values };
+    if (conflict) conflicts.push(`jobDates.${field}`);
+  }
+  return output;
+}
+
+function nestedDateFact(value: Record<string, unknown>, field: string): { state: string; values: unknown[] } | null {
+  const dates = value.jobDates;
+  if (dates === null || typeof dates !== "object") return null;
+  const fact = (dates as Record<string, unknown>)[field];
+  return isFact(fact) ? fact : null;
+}
+
+function factState(jobDates: unknown, field: string): "known" | "unknown" | "conflicting" {
+  if (jobDates === null || typeof jobDates !== "object") return "unknown";
+  const value = (jobDates as Record<string, unknown>)[field];
+  if (!isFact(value)) return "unknown";
+  return value.state === "known" || value.state === "conflicting" ? value.state : "unknown";
+}
+
+function isFact(value: unknown): value is { state: string; values: unknown[]; unknownReason?: unknown } {
   return value !== null && typeof value === "object" && "state" in value && "values" in value && Array.isArray(value.values);
+}
+
+function strongestUnknownReason(facts: Array<{ state: string; values: unknown[] }>): string {
+  const order = ["provider_failed", "low_confidence", "unsupported_format", "not_parsed", "not_mentioned"];
+  const reasons = facts.flatMap((fact) => {
+    const value = (fact as { unknownReason?: unknown }).unknownReason;
+    return typeof value === "string" ? [value] : [];
+  });
+  return order.find((candidate) => reasons.includes(candidate)) ?? "not_parsed";
+}
+
+function determineReadiness(
+  structured: Record<string, unknown>,
+  primaryOrigin: ActiveInput["extraction_origin"],
+  enrichmentEnabled: boolean,
+): { state: "ready" | "pending_enrichment" | "needs_review"; reasons: string[] } {
+  const employment = isFact(structured.employmentTypes) ? structured.employmentTypes : { state: "unknown", values: [] };
+  const locations = isFact(structured.locations) ? structured.locations : { state: "unknown", values: [] };
+  const reasons = [
+    ...(employment.state === "known" ? [] : ["employment_unresolved"]),
+    ...(locations.state === "known" ? [] : ["location_unresolved"]),
+  ];
+  if (reasons.length === 0) return { state: "ready", reasons: [] };
+  if (employment.state === "conflicting" || locations.state === "conflicting") return { state: "needs_review", reasons };
+  return { state: enrichmentEnabled && primaryOrigin === "deterministic" ? "pending_enrichment" : "needs_review", reasons };
 }
 
 function uniqueValues(values: unknown[]): unknown[] {

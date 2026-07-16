@@ -31,6 +31,24 @@ try {
       process.stdout.write(`updated ${row.tenant_key}: ${row.interval_hours}h\n`);
     }
   }
+  if (["AI_ENRICHMENT_ENABLED", "SEMANTIC_RETRIEVAL_ENABLED", "AI_EXPLANATIONS_ENABLED"]
+    .some((name) => process.env[name] === "true")) {
+    const scheduleId = "ai-task-sweep";
+    try {
+      await temporal.schedule.create({
+        scheduleId,
+        spec: { intervals: [{ every: "1m" }] },
+        action: { type: "startWorkflow", workflowType: "aiTaskSweepWorkflow", taskQueue,
+          args: [], workflowId: `${scheduleId}-scheduled` },
+      });
+      process.stdout.write("created ai-task-sweep: 1m\n");
+    } catch (error) {
+      if (!(error instanceof Error) || !/already exists/i.test(error.message)) throw error;
+      const handle = temporal.schedule.getHandle(scheduleId);
+      await handle.update((current) => ({ ...current, spec: { intervals: [{ every: "1m" }] } }));
+      process.stdout.write("updated ai-task-sweep: 1m\n");
+    }
+  }
 } finally {
   await database.end();
   await connection.close();

@@ -102,7 +102,8 @@ export class SourceSyncService {
     let persistedVersions = 0;
     try {
       for (const discovered of snapshot.jobs) {
-        const exact = singleExact ?? await this.connector.fetchRecord(discovered.identity, signal);
+        const exact = singleExact ?? (discovered.exactRecordResponse === true
+          ? discovered : await this.connector.fetchRecord(discovered.identity, signal));
         const result = await this.persistRecord(syncRunId, exact);
         persistedRecords += result.recordCreated ? 1 : 0;
         persistedVersions += result.versionCreated ? 1 : 0;

@@ -3,7 +3,8 @@ import type { SafeProfile } from "../../profile/src/build-profile.js";
 import { evaluateJob, type CanonicalJobForMatch } from "./evaluate-job.js";
 
 const profile = {
-  schemaVersion: "profile-v1", targetChannels: ["new_grad_2027"], rolePriorities: [], locations: {},
+  schemaVersion: "profile-v1", targetChannels: ["new_grad_2027"],
+  rolePriorities: [{ group: "product_web_ai_engineering", weight: 1 }], locations: {},
   employment: { preferred: ["permanent"], needsConfirmation: ["fixed_term"], excluded: ["dispatch", "independent_contractor", "part_time", "ses_on_site"] },
   languages: [{ code: "ja", level: "JLPT N1" }, { code: "zh", level: "native" }], visa: {}, compensation: {},
   normalizedSkills: ["TypeScript", "React"], experienceSignals: ["web_product"],
@@ -55,5 +56,27 @@ describe("deterministic Profile matching", () => {
   it("keeps every factual match and gap evidence-backed", () => {
     const result = evaluateJob(profile, job());
     expect([...result.matched, ...result.gaps].every((item) => item.evidenceIds.length > 0)).toBe(true);
+  });
+
+  it("ranks office roles for an office profile without giving engineering titles a fallback role score", () => {
+    const officeProfile = { ...profile, rolePriorities: [
+      { group: "office_administration", weight: 1 },
+      { group: "human_resources_recruiting", weight: 0.8 },
+    ] };
+    const office = evaluateJob(officeProfile, job({ title: "一般事務" }));
+    const humanResources = evaluateJob(officeProfile, job({ title: "人事アシスタント" }));
+    const engineering = evaluateJob(officeProfile, job({ title: "Backend Engineer" }));
+    expect(office.scoreBreakdown.find((part) => part.key === "role_direction")?.score).toBe(25);
+    expect(humanResources.scoreBreakdown.find((part) => part.key === "role_direction")?.score).toBe(20);
+    expect(engineering.scoreBreakdown.find((part) => part.key === "role_direction")?.score).toBe(0);
+  });
+
+  it("uses explicit title employment when structured employment is missing", () => {
+    const unknownEmployment = { ...job().structured, employmentTypes: { state: "unknown", values: [] } };
+    const partTime = evaluateJob(profile, job({ title: "【アルバイト・パート】一般事務", structured: unknownEmployment }));
+    const partnerSales = evaluateJob(profile, job({ title: "パートナーセールス", structured: unknownEmployment }));
+    expect(partTime.hardRejectReasons).toContain("explicitly_excluded_employment");
+    expect(partTime.gaps.find((item) => item.field === "employmentTypes")?.evidenceIds).toContain("e5");
+    expect(partnerSales.hardRejectReasons).not.toContain("explicitly_excluded_employment");
   });
 });

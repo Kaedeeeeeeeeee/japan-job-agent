@@ -1,0 +1,868 @@
+{
+  "generatedAt": "2026-07-14T17:14:14.650Z",
+  "reportDate": "2026-07-15",
+  "validCandidates": 10219,
+  "sourceFamilies": [
+    {
+      "name": "engage",
+      "count": 3300,
+      "share": 0.322928
+    },
+    {
+      "name": "talentio",
+      "count": 3294,
+      "share": 0.322341
+    },
+    {
+      "name": "yolo_japan",
+      "count": 3050,
+      "share": 0.298464
+    },
+    {
+      "name": "smartrecruiters",
+      "count": 236,
+      "share": 0.023094
+    },
+    {
+      "name": "hrmos",
+      "count": 87,
+      "share": 0.008514
+    },
+    {
+      "name": "greenhouse",
+      "count": 70,
+      "share": 0.00685
+    },
+    {
+      "name": "airwork",
+      "count": 51,
+      "share": 0.004991
+    },
+    {
+      "name": "ashby",
+      "count": 46,
+      "share": 0.004501
+    },
+    {
+      "name": "lever",
+      "count": 43,
+      "share": 0.004208
+    },
+    {
+      "name": "herp",
+      "count": 40,
+      "share": 0.003914
+    },
+    {
+      "name": "jobcan",
+      "count": 2,
+      "share": 0.000196
+    }
+  ],
+  "states": [
+    {
+      "state": "discovered",
+      "count": 9004
+    },
+    {
+      "state": "promoted",
+      "count": 1572
+    }
+  ],
+  "priorities": [
+    {
+      "name": "p0",
+      "count": 5190
+    },
+    {
+      "name": "p2",
+      "count": 3199
+    },
+    {
+      "name": "p1",
+      "count": 1091
+    },
+    {
+      "name": "p3",
+      "count": 739
+    }
+  ],
+  "industries": [
+    {
+      "name": "その他",
+      "count": 4765
+    },
+    {
+      "name": "IT・Web・AI・EC",
+      "count": 2130
+    },
+    {
+      "name": "製造",
+      "count": 1061
+    },
+    {
+      "name": "介護・医療",
+      "count": 562
+    },
+    {
+      "name": "小売",
+      "count": 531
+    },
+    {
+      "name": "物流",
+      "count": 427
+    },
+    {
+      "name": "ITコンサル・HR・人事",
+      "count": 400
+    },
+    {
+      "name": "ホテル・観光",
+      "count": 309
+    },
+    {
+      "name": "金融",
+      "count": 34
+    }
+  ],
+  "locations": [
+    {
+      "name": "東京都",
+      "count": 4399
+    },
+    {
+      "name": "大阪府",
+      "count": 622
+    },
+    {
+      "name": "日本・都道府県未分類",
+      "count": 574
+    },
+    {
+      "name": "神奈川県",
+      "count": 532
+    },
+    {
+      "name": "埼玉県",
+      "count": 439
+    },
+    {
+      "name": "千葉県",
+      "count": 361
+    },
+    {
+      "name": "愛知県",
+      "count": 336
+    },
+    {
+      "name": "京都府",
+      "count": 181
+    },
+    {
+      "name": "兵庫県",
+      "count": 181
+    },
+    {
+      "name": "北海道",
+      "count": 177
+    },
+    {
+      "name": "広島県",
+      "count": 163
+    },
+    {
+      "name": "静岡県",
+      "count": 155
+    },
+    {
+      "name": "福岡県",
+      "count": 151
+    },
+    {
+      "name": "茨城県",
+      "count": 127
+    },
+    {
+      "name": "群馬県",
+      "count": 102
+    },
+    {
+      "name": "栃木県",
+      "count": 96
+    },
+    {
+      "name": "岡山県",
+      "count": 92
+    },
+    {
+      "name": "鹿児島県",
+      "count": 85
+    },
+    {
+      "name": "沖縄県",
+      "count": 82
+    },
+    {
+      "name": "岐阜県",
+      "count": 71
+    },
+    {
+      "name": "長野県",
+      "count": 70
+    },
+    {
+      "name": "新潟県",
+      "count": 64
+    },
+    {
+      "name": "滋賀県",
+      "count": 63
+    },
+    {
+      "name": "宮城県",
+      "count": 61
+    },
+    {
+      "name": "愛媛県",
+      "count": 56
+    },
+    {
+      "name": "熊本県",
+      "count": 52
+    },
+    {
+      "name": "山梨県",
+      "count": 51
+    },
+    {
+      "name": "富山県",
+      "count": 49
+    },
+    {
+      "name": "福井県",
+      "count": 48
+    },
+    {
+      "name": "三重県",
+      "count": 45
+    },
+    {
+      "name": "石川県",
+      "count": 45
+    },
+    {
+      "name": "福島県",
+      "count": 36
+    },
+    {
+      "name": "和歌山県",
+      "count": 33
+    },
+    {
+      "name": "岩手県",
+      "count": 32
+    },
+    {
+      "name": "大分県",
+      "count": 31
+    },
+    {
+      "name": "奈良県",
+      "count": 30
+    },
+    {
+      "name": "長崎県",
+      "count": 26
+    },
+    {
+      "name": "佐賀県",
+      "count": 24
+    },
+    {
+      "name": "山形県",
+      "count": 24
+    },
+    {
+      "name": "秋田県",
+      "count": 22
+    },
+    {
+      "name": "島根県",
+      "count": 22
+    },
+    {
+      "name": "宮崎県",
+      "count": 19
+    },
+    {
+      "name": "山口県",
+      "count": 19
+    },
+    {
+      "name": "高知県",
+      "count": 18
+    },
+    {
+      "name": "■愛知県",
+      "count": 17
+    },
+    {
+      "name": "■福岡県",
+      "count": 17
+    },
+    {
+      "name": "香川県",
+      "count": 17
+    },
+    {
+      "name": "】愛知県",
+      "count": 16
+    },
+    {
+      "name": "■埼玉県",
+      "count": 16
+    },
+    {
+      "name": "徳島県",
+      "count": 16
+    },
+    {
+      "name": "青森県",
+      "count": 14
+    },
+    {
+      "name": "日本国内リモート",
+      "count": 14
+    },
+    {
+      "name": "：愛知県",
+      "count": 13
+    },
+    {
+      "name": "■茨城県",
+      "count": 11
+    },
+    {
+      "name": "鳥取県",
+      "count": 11
+    },
+    {
+      "name": "：静岡県",
+      "count": 10
+    },
+    {
+      "name": "■沖縄県",
+      "count": 10
+    },
+    {
+      "name": "■千葉県",
+      "count": 10
+    },
+    {
+      "name": "■群馬県",
+      "count": 8
+    },
+    {
+      "name": "■兵庫県",
+      "count": 8
+    },
+    {
+      "name": "・愛知県",
+      "count": 6
+    },
+    {
+      "name": "：山形県",
+      "count": 6
+    },
+    {
+      "name": "（長野県",
+      "count": 6
+    },
+    {
+      "name": "■静岡県",
+      "count": 5
+    },
+    {
+      "name": "：兵庫県",
+      "count": 4
+    },
+    {
+      "name": "）愛知県",
+      "count": 4
+    },
+    {
+      "name": "】山口県",
+      "count": 4
+    },
+    {
+      "name": "|長野県",
+      "count": 4
+    },
+    {
+      "name": "■滋賀県",
+      "count": 4
+    },
+    {
+      "name": "■石川県",
+      "count": 4
+    },
+    {
+      "name": "■奈良県",
+      "count": 4
+    },
+    {
+      "name": "6福岡県",
+      "count": 4
+    },
+    {
+      "name": "：茨城県",
+      "count": 3
+    },
+    {
+      "name": "：栃木県",
+      "count": 3
+    },
+    {
+      "name": "〉千葉県",
+      "count": 3
+    },
+    {
+      "name": "■岡山県",
+      "count": 3
+    },
+    {
+      "name": "■広島県",
+      "count": 3
+    },
+    {
+      "name": "■新潟県",
+      "count": 3
+    },
+    {
+      "name": "■長崎県",
+      "count": 3
+    },
+    {
+      "name": "・岡山県",
+      "count": 2
+    },
+    {
+      "name": "・宮崎県",
+      "count": 2
+    },
+    {
+      "name": "・千葉県",
+      "count": 2
+    },
+    {
+      "name": "：熊本県",
+      "count": 2
+    },
+    {
+      "name": "：群馬県",
+      "count": 2
+    },
+    {
+      "name": "：長野県",
+      "count": 2
+    },
+    {
+      "name": "（静岡県",
+      "count": 2
+    },
+    {
+      "name": "■岐阜県",
+      "count": 2
+    },
+    {
+      "name": "■香川県",
+      "count": 2
+    },
+    {
+      "name": "■三重県",
+      "count": 2
+    },
+    {
+      "name": "■山形県",
+      "count": 2
+    },
+    {
+      "name": "■山梨県",
+      "count": 2
+    },
+    {
+      "name": "■青森県",
+      "count": 2
+    },
+    {
+      "name": "■徳島県",
+      "count": 2
+    },
+    {
+      "name": "■福井県",
+      "count": 2
+    },
+    {
+      "name": "■福島県",
+      "count": 2
+    },
+    {
+      "name": "①長野県",
+      "count": 2
+    },
+    {
+      "name": "3愛知県",
+      "count": 2
+    },
+    {
+      "name": "店愛知県",
+      "count": 2
+    },
+    {
+      "name": "・沖縄県",
+      "count": 1
+    },
+    {
+      "name": "・岩手県",
+      "count": 1
+    },
+    {
+      "name": "・広島県",
+      "count": 1
+    },
+    {
+      "name": "・山口県",
+      "count": 1
+    },
+    {
+      "name": "・秋田県",
+      "count": 1
+    },
+    {
+      "name": "・新潟県",
+      "count": 1
+    },
+    {
+      "name": "・青森県",
+      "count": 1
+    },
+    {
+      "name": "・長野県",
+      "count": 1
+    },
+    {
+      "name": "・島根県",
+      "count": 1
+    },
+    {
+      "name": "・福島県",
+      "count": 1
+    },
+    {
+      "name": "、広島県",
+      "count": 1
+    },
+    {
+      "name": "：岐阜県",
+      "count": 1
+    },
+    {
+      "name": "：宮城県",
+      "count": 1
+    },
+    {
+      "name": "：三重県",
+      "count": 1
+    },
+    {
+      "name": "：山梨県",
+      "count": 1
+    },
+    {
+      "name": "：石川県",
+      "count": 1
+    },
+    {
+      "name": "：福岡県",
+      "count": 1
+    },
+    {
+      "name": "（石川県",
+      "count": 1
+    },
+    {
+      "name": "】静岡県",
+      "count": 1
+    },
+    {
+      "name": "】福岡県",
+      "count": 1
+    },
+    {
+      "name": "■宮城県",
+      "count": 1
+    },
+    {
+      "name": "1愛知県",
+      "count": 1
+    },
+    {
+      "name": "2広島県",
+      "count": 1
+    },
+    {
+      "name": "3岐阜県",
+      "count": 1
+    },
+    {
+      "name": "4福岡県",
+      "count": 1
+    },
+    {
+      "name": "5岩手県",
+      "count": 1
+    },
+    {
+      "name": "5兵庫県",
+      "count": 1
+    },
+    {
+      "name": "8愛知県",
+      "count": 1
+    },
+    {
+      "name": "で複数県",
+      "count": 1
+    },
+    {
+      "name": "一都三県",
+      "count": 1
+    },
+    {
+      "name": "店岡山県",
+      "count": 1
+    }
+  ],
+  "topCompanies": [
+    {
+      "name": "株式会社ＵｎｌｉｍｉｔｅｄＧｌｏｗｔｈ",
+      "count": 419
+    },
+    {
+      "name": "ライフウェル合同会社",
+      "count": 282
+    },
+    {
+      "name": "学校法人角川ドワンゴ学園",
+      "count": 260
+    },
+    {
+      "name": "株式会社アスパーク",
+      "count": 241
+    },
+    {
+      "name": "株式会社エス・エム・エス",
+      "count": 211
+    },
+    {
+      "name": "株式会社ＦｒｉＳｔａｄ",
+      "count": 205
+    },
+    {
+      "name": "株式会社ネクステージ",
+      "count": 170
+    },
+    {
+      "name": "WBPグループ株式会社",
+      "count": 164
+    },
+    {
+      "name": "株式会社メガネトップ",
+      "count": 160
+    },
+    {
+      "name": "株式会社コネクト",
+      "count": 144
+    },
+    {
+      "name": "アデコ株式会社M",
+      "count": 128
+    },
+    {
+      "name": "アイビーズ株式会社",
+      "count": 117
+    },
+    {
+      "name": "株式会社テイクス　錦糸町オフィス",
+      "count": 116
+    },
+    {
+      "name": "株式会社LayerX",
+      "count": 109
+    },
+    {
+      "name": "Bosch Group",
+      "count": 98
+    },
+    {
+      "name": "株式会社エクサウィザーズ",
+      "count": 94
+    },
+    {
+      "name": "株式会社SGI",
+      "count": 82
+    },
+    {
+      "name": "株式会社アイ・スタイル",
+      "count": 80
+    },
+    {
+      "name": "株式会社Preferred Networks",
+      "count": 77
+    },
+    {
+      "name": "株式会社 BACKSTAGE",
+      "count": 67
+    },
+    {
+      "name": "福地建設株式会社",
+      "count": 60
+    },
+    {
+      "name": "株式会社むらさき",
+      "count": 58
+    },
+    {
+      "name": "株式会社グッドキャスト",
+      "count": 56
+    },
+    {
+      "name": "株式会社フリークアウト・ホールディングス",
+      "count": 52
+    },
+    {
+      "name": "株式会社オプティム",
+      "count": 47
+    },
+    {
+      "name": "株式会社ファイブグループ",
+      "count": 47
+    },
+    {
+      "name": "エムスリーマーケティング株式会社",
+      "count": 46
+    },
+    {
+      "name": "Ｋ－Ｌｉｎｅ株式会社",
+      "count": 42
+    },
+    {
+      "name": "株式会社ＨＩＲＯＫＩＹＡ",
+      "count": 42
+    },
+    {
+      "name": "株式会社マイベスト",
+      "count": 42
+    },
+    {
+      "name": "武井電機工業株式会社",
+      "count": 41
+    },
+    {
+      "name": "株式会社アウトソーシングトータルサポート",
+      "count": 40
+    },
+    {
+      "name": "ＵＰＷＯＲＬＤ株式会社",
+      "count": 39
+    },
+    {
+      "name": "オーガニックグループ株式会社",
+      "count": 39
+    },
+    {
+      "name": "株式会社ヤプリ",
+      "count": 39
+    },
+    {
+      "name": "京都フュージョニアリング株式会社",
+      "count": 39
+    },
+    {
+      "name": "セーフィー株式会社",
+      "count": 38
+    },
+    {
+      "name": "マネックスグループ株式会社",
+      "count": 38
+    },
+    {
+      "name": "株式会社Staple",
+      "count": 38
+    },
+    {
+      "name": "株式会社モリコー",
+      "count": 38
+    },
+    {
+      "name": "株式会社インフキュリオン",
+      "count": 37
+    },
+    {
+      "name": "株式会社レアゾン・ホールディングス",
+      "count": 37
+    },
+    {
+      "name": "株式会社グローバルジョブズ",
+      "count": 36
+    },
+    {
+      "name": "株式会社ゼログループ",
+      "count": 36
+    },
+    {
+      "name": "Ｎｅｘｃａｌｅ合同会社",
+      "count": 35
+    },
+    {
+      "name": "エムスリーキャリア株式会社",
+      "count": 35
+    },
+    {
+      "name": "株式会社くふう住まい",
+      "count": 35
+    },
+    {
+      "name": "学校法人日本財団ドワンゴ学園",
+      "count": 34
+    },
+    {
+      "name": "ジャパンシステム株式会社",
+      "count": 33
+    },
+    {
+      "name": "AbbVie",
+      "count": 32
+    }
+  ],
+  "dates": {
+    "publishedKnown": 9469,
+    "publishedUnknown": 750,
+    "unknownRate": 0.073393
+  },
+  "officialExit": {
+    "resolved": 1248,
+    "unresolved": 8971,
+    "resolutionRate": 0.122125
+  },
+  "duplicates": {
+    "external_keys": 0,
+    "detail_urls": 0,
+    "official_urls": 0
+  },
+  "terminal": {
+    "total": 10576,
+    "rejected": 0,
+    "expired": 0
+  }
+}

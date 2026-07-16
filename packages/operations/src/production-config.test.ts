@@ -22,6 +22,9 @@ const shared = {
   POSTGRES_PWD: "secret",
   DBNAME: "temporal",
   VISIBILITY_DBNAME: "temporal_visibility",
+  AI_ENRICHMENT_ENABLED: "false",
+  SEMANTIC_RETRIEVAL_ENABLED: "false",
+  AI_EXPLANATIONS_ENABLED: "false",
 };
 
 describe("production service preflight", () => {
@@ -42,5 +45,24 @@ describe("production service preflight", () => {
       "API_BASE_URL", "API_INTERNAL_TOKEN", "AUTH_SECRET", "AUTH_GITHUB_ID", "ALLOWED_GITHUB_LOGIN",
     ]));
     expect(JSON.stringify(issues)).not.toContain("secret-value");
+  });
+
+  it("requires provider credentials and all model keys when AI is enabled", () => {
+    const issues = validateProductionConfig("worker", { ...shared, AI_ENRICHMENT_ENABLED: "true" });
+    expect(issues.map((issue) => issue.variable)).toEqual(expect.arrayContaining([
+      "AI_BASE_URL", "AI_API_KEY", "AI_EXTRACTION_MODEL", "AI_EMBEDDING_MODEL", "AI_EXPLANATION_MODEL",
+    ]));
+    expect(validateProductionConfig("worker", { ...shared, AI_ENRICHMENT_ENABLED: "true",
+      AI_BASE_URL: "https://ai.example/v1", AI_API_KEY: "secret", AI_EXTRACTION_MODEL: "extract",
+      AI_EMBEDDING_MODEL: "embed", AI_EXPLANATION_MODEL: "explain" })).toEqual([]);
+  });
+
+  it.each<ProductionService>(["api", "web", "worker", "backup", "temporal"])("accepts local-disk Linux %s configuration", (service) => {
+    const linux = { ...shared, DEPLOYMENT_TARGET: "linux", DATABASE_URL: "postgresql://postgres:secret@postgres:5432/jja",
+      API_BASE_URL: "http://api:3000", AUTH_URL: "https://jja.example-tailnet.ts.net", RAW_STORAGE_PATH: "/data/raw",
+      BACKUP_OUTPUT_PATH: "/data/backups/jja.dump", TEMPORAL_ADDRESS: "temporal:7233", POSTGRES_SEEDS: "postgres",
+      S3_BUCKET: undefined, BACKUP_BUCKET: undefined, S3_ENDPOINT: undefined, S3_REGION: undefined,
+      AWS_ACCESS_KEY_ID: undefined, AWS_SECRET_ACCESS_KEY: undefined, DBNAME: undefined, VISIBILITY_DBNAME: undefined };
+    expect(validateProductionConfig(service, linux)).toEqual([]);
   });
 });

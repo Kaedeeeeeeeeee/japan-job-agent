@@ -24,6 +24,10 @@ describe("restricted on-demand refresh policy", () => {
     });
   });
 
+  it.each(["hrmos", "herp", "jobcan", "airwork", "engage", "talentio"])("allows stale refreshes for %s sources", (sourceKind) => {
+    expect(evaluateRefreshPolicy({ ...baseline, sourceKind }).eligible).toBe(true);
+  });
+
   it("requires saved or applied state", () => {
     expect(evaluateRefreshPolicy({ ...baseline, saved: false }).reason).toBe("save_or_apply_required");
     expect(evaluateRefreshPolicy({ ...baseline, saved: false, applied: true }).eligible).toBe(true);

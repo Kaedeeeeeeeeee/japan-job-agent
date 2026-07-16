@@ -4,20 +4,33 @@ import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { CanonicalService } from "../../canonical/src/canonical-service.js";
 import { GreenhouseConnector } from "../../connectors-greenhouse/src/greenhouse-connector.js";
+import { HrmosConnector } from "../../connectors-hrmos/src/hrmos-connector.js";
+import { PublicCareerConnector, type PublicCareerKind } from "../../connectors-public-career/src/public-career-connector.js";
+import { AshbyConnector, LeverConnector, SmartRecruitersConnector } from "../../connectors-public-ats/src/public-ats-connectors.js";
 import { SchemaOrgConnector } from "../../connectors-schema-org/src/schema-org-connector.js";
-import type { SourceInstanceRef } from "../../contracts/src/index.js";
+import type { SourceInstanceRef, SourceKind } from "../../contracts/src/index.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
 import { ExtractionService } from "../../extraction/src/extraction-service.js";
 import { SourceSyncService } from "../../ingestion/src/source-sync-service.js";
 import { DeterministicJobParser } from "../../parser/src/deterministic-job-parser.js";
+import type { ParsedJob } from "../../parser/src/deterministic-job-parser.js";
+import { createAiProviderFromEnv, loadAiProviderConfig } from "../../ai/src/ai-provider.js";
+import { AiTaskService, enrichableUnknownFields } from "../../ai/src/ai-task-service.js";
+import {
+  AiTaskProcessor,
+  enqueueFieldEnrichment,
+  enqueueJobEmbedding,
+  enqueueSectionEmbeddings,
+} from "../../ai/src/ai-task-processor.js";
 import { createObjectStore } from "../../../scripts/object-store-config.js";
 import type { SourceSyncWorkflowInput } from "../../workflows/src/source-sync-workflow.js";
 
 const { Pool } = pg;
+const sourceFetch = rateLimitedFetch(Math.max(1_000, Number(process.env.SOURCE_HOST_INTERVAL_MS ?? 1_000)));
 
 interface SourceRow {
   id: string;
-  source_kind: "greenhouse" | "schema_org" | "manual";
+  source_kind: SourceKind;
   tenant_key: string;
   base_url: string;
 }
@@ -33,6 +46,31 @@ export interface SourcePipelineResult {
 export interface FinalizeRefreshFailureInput {
   refreshRequestId: string;
   reason: string;
+}
+
+export interface AiTaskSweepResult {
+  claimed: number;
+  succeeded: number;
+  failed: number;
+  budgetExhausted: boolean;
+  disabled?: boolean;
+}
+
+export async function processAiTasksActivity(): Promise<AiTaskSweepResult> {
+  const provider = createAiProviderFromEnv();
+  const config = loadAiProviderConfig();
+  if (provider === null || config === null) return { claimed: 0, succeeded: 0, failed: 0, budgetExhausted: false, disabled: true };
+  const pool = new Pool({ connectionString: required("DATABASE_URL") });
+  const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool }) });
+  try {
+    const workerId = `${activityInfo().workflowExecution?.workflowId ?? "ai-sweep"}:${randomUUID()}`;
+    return await new AiTaskProcessor(db, provider, {
+      concurrency: config.concurrency,
+      dailyTokenBudget: config.dailyTokenBudget,
+    }).processBatch(workerId);
+  } finally {
+    await db.destroy();
+  }
 }
 
 export async function finalizeRefreshFailureActivity(input: FinalizeRefreshFailureInput): Promise<void> {
@@ -105,12 +143,23 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
   const row = sourceResult.rows[0];
   if (row === undefined) throw ApplicationFailure.nonRetryable("Verified source does not exist", "SOURCE_NOT_VERIFIED");
   if (row.source_kind === "manual") throw ApplicationFailure.nonRetryable("Manual sources are not scheduled", "MANUAL_SOURCE");
+  if (row.source_kind === "workday") throw ApplicationFailure.nonRetryable(
+    "Workday sources require per-tenant policy validation before scheduling",
+    "WORKDAY_POLICY_REVIEW_REQUIRED",
+  );
   const source: SourceInstanceRef = { id: row.id, sourceKind: row.source_kind, tenantKey: row.tenant_key, baseUrl: row.base_url };
   const store = createObjectStore();
   const idempotencyKey = `temporal:${workflowId}:${runId}`;
   let snapshotKind = "reused";
-  if (row.source_kind === "greenhouse") {
-    const result = await new SourceSyncService(db, new GreenhouseConnector(), store).run({
+  if (["greenhouse", "hrmos", "herp", "jobcan", "airwork", "engage", "talentio",
+    "smartrecruiters", "lever", "ashby"].includes(row.source_kind)) {
+    const connector = row.source_kind === "greenhouse" ? new GreenhouseConnector(sourceFetch)
+      : row.source_kind === "hrmos" ? new HrmosConnector(sourceFetch)
+      : row.source_kind === "smartrecruiters" ? new SmartRecruitersConnector(sourceFetch)
+      : row.source_kind === "lever" ? new LeverConnector(sourceFetch)
+      : row.source_kind === "ashby" ? new AshbyConnector(sourceFetch)
+      : new PublicCareerConnector(row.source_kind as PublicCareerKind, sourceFetch);
+    const result = await new SourceSyncService(db, connector, store).run({
       source, idempotencyKey, temporalWorkflowId: workflowId, temporalRunId: runId,
     });
     snapshotKind = result.snapshot?.kind ?? "reused";
@@ -119,7 +168,7 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
       WHERE source_instance_id=${row.id}::uuid ORDER BY first_seen_at LIMIT 1`.execute(db);
     const identity = record.rows[0];
     if (identity === undefined) throw ApplicationFailure.nonRetryable("Schema source has no seeded record identity", "SCHEMA_IDENTITY_MISSING");
-    const result = await new SourceSyncService(db, new SchemaOrgConnector(), store).run({
+    const result = await new SourceSyncService(db, new SchemaOrgConnector(sourceFetch), store).run({
       source, idempotencyKey, temporalWorkflowId: workflowId, temporalRunId: runId,
       recordIdentity: { sourceInstanceId: row.id, stableKey: identity.stable_key, canonicalUrl: identity.canonical_url },
     });
@@ -131,15 +180,45 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
       WHERE e.source_job_version_id=v.id AND e.parser_key=${parser.parserKey} AND e.parser_version=${parser.parserVersion}
       AND e.schema_version=${parser.schemaVersion}) ORDER BY v.fetched_at`.execute(db);
   const extractionService = new ExtractionService(db, store);
-  const canonicalService = new CanonicalService(db);
+  const provider = createAiProviderFromEnv();
+  const enrichmentEnabled = process.env.AI_ENRICHMENT_ENABLED === "true";
+  const semanticEnabled = process.env.SEMANTIC_RETRIEVAL_ENABLED === "true";
+  const canonicalService = new CanonicalService(db, { enrichmentEnabled: enrichmentEnabled && provider !== null });
+  const aiTasks = provider === null ? null : new AiTaskService(db);
   let succeeded = 0;
   let materialized = 0;
   for (const version of versions.rows) {
     const extraction = await extractionService.extract(version.id, parser);
     if (extraction.status !== "succeeded") continue;
     succeeded += 1;
-    await canonicalService.materialize(extraction.extractionId);
+    const canonical = await canonicalService.materialize(extraction.extractionId);
     materialized += 1;
+    if (provider !== null && aiTasks !== null) {
+      const parsed = await sql<{ structured_result: ParsedJob; content_hash: string }>`SELECT e.structured_result,v.content_hash
+        FROM source_job_extractions e JOIN source_job_versions v ON v.id=e.source_job_version_id
+        WHERE e.id=${extraction.extractionId}::uuid`.execute(db);
+      const extractionRow = parsed.rows[0];
+      if (extractionRow !== undefined && enrichmentEnabled) {
+        const fields = enrichableUnknownFields(extractionRow.structured_result);
+        await enqueueFieldEnrichment(aiTasks, provider, {
+          sourceJobVersionId: version.id,
+          baseExtractionId: extraction.extractionId,
+          rawContentHash: extractionRow.content_hash,
+          schemaVersion: parser.schemaVersion,
+          parserVersion: parser.parserVersion,
+          fields,
+        });
+      }
+      if (enrichmentEnabled || semanticEnabled) await enqueueSectionEmbeddings(db, aiTasks, provider, version.id);
+      if (semanticEnabled) {
+        const canonicalVersion = await sql<{ readiness: string; content_hash: string }>`SELECT readiness,content_hash
+          FROM canonical_job_versions WHERE id=${canonical.canonicalJobVersionId}::uuid`.execute(db);
+        const canonicalRow = canonicalVersion.rows[0];
+        if (canonicalRow?.readiness === "ready") {
+          await enqueueJobEmbedding(aiTasks, provider, canonical.canonicalJobVersionId, canonicalRow.content_hash);
+        }
+      }
+    }
   }
   await sql`UPDATE source_schedules SET next_run_at=now()+make_interval(hours=>interval_hours),updated_at=now()
     WHERE source_instance_id=${row.id}::uuid`.execute(db);
@@ -171,4 +250,15 @@ function required(name: string): string {
   const value = process.env[name];
   if (value === undefined || value === "") throw new Error(`${name} is required`);
   return value;
+}
+
+function rateLimitedFetch(intervalMs: number): typeof fetch {
+  const nextByHost = new Map<string, number>();
+  return async (input: string | URL | globalThis.Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    const wait = Math.max(0, (nextByHost.get(url.hostname) ?? 0) - Date.now());
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    nextByHost.set(url.hostname, Date.now() + intervalMs);
+    return fetch(input, init);
+  };
 }

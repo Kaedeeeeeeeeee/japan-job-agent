@@ -21,6 +21,7 @@ export class SchemaOrgConnector implements SourceConnector {
     private readonly fetchImplementation: typeof fetch = fetch,
     private readonly resolve: Resolver = resolvePublicAddresses,
     private readonly maximumBytes = 5 * 1024 * 1024,
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   async fetchCollectionPage(_request: CollectionPageRequest): Promise<CollectionPage> {
@@ -30,6 +31,13 @@ export class SchemaOrgConnector implements SourceConnector {
   async fetchRecord(identity: SourceJobIdentity, signal: AbortSignal): Promise<DiscoveredJob> {
     const fetched = await this.safeFetch(new URL(identity.canonicalUrl), signal);
     const posting = findJobPosting(fetched.bytes);
+    const validThrough = stringValue(posting.validThrough);
+    if (validThrough !== undefined) {
+      const expiry = Date.parse(validThrough);
+      if (!Number.isNaN(expiry) && expiry < this.now().getTime()) {
+        throw new ConnectorError("record_closed", `JobPosting expired at ${validThrough}`, false);
+      }
+    }
     const postingUrl = stringValue(posting.url) ?? identity.canonicalUrl;
     const externalId = identifierValue(posting.identifier) ?? identity.externalId;
     return {
