@@ -4,7 +4,7 @@ import { load } from "cheerio";
 import { findJobPosting } from "../../connectors-schema-org/src/schema-org-connector.js";
 
 export type DetectedRecruitmentSourceKind = "hrmos" | "schema_org" | "greenhouse" | "herp" | "talentio"
-  | "smartrecruiters" | "workday" | "jobcan" | "airwork" | "engage" | "jobposting" | "wantedly";
+  | "smartrecruiters" | "lever" | "ashby" | "workday" | "jobcan" | "airwork" | "engage" | "jobposting" | "wantedly";
 
 export interface DetectedRecruitmentSource {
   kind: DetectedRecruitmentSourceKind;
@@ -59,8 +59,9 @@ export async function auditRecruitmentEntrypoint(
       if (bytes.byteLength > 5 * 1024 * 1024) return failed(requestedUrl, "blocked", response.status, false, "response exceeds 5 MB", fetchedAt, current.toString());
       const html = new TextDecoder().decode(bytes);
       const links = extractCandidateLinks(html, current);
+      const embeddedSources = extractEmbeddedSourceUrls(html);
       const detected = new Map<string, DetectedRecruitmentSource>();
-      for (const source of [detectSource(current.toString()), ...links.map(detectSource)]) {
+      for (const source of [detectSource(current.toString()), ...links.map(detectSource), ...embeddedSources.map(detectSource)]) {
         if (source !== null) detected.set(`${source.kind}:${source.tenantKey}:${source.url}`, source);
       }
       try {
@@ -117,6 +118,20 @@ export function detectSource(value: string): DetectedRecruitmentSource | null {
   if (host === "jobs.smartrecruiters.com" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
     return { kind: "smartrecruiters", tenantKey: match[1] ?? "", url: `https://jobs.smartrecruiters.com/${match[1]}`, collection: true };
   }
+  if (host === "careers.smartrecruiters.com" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
+    return { kind: "smartrecruiters", tenantKey: match[1] ?? "",
+      url: `https://api.smartrecruiters.com/v1/companies/${match[1]}/postings`, collection: true };
+  }
+  if (host === "api.smartrecruiters.com" && (match = url.pathname.match(/^\/v1\/companies\/([^/]+)\/postings/)) !== null) {
+    return { kind: "smartrecruiters", tenantKey: match[1] ?? "",
+      url: `https://api.smartrecruiters.com/v1/companies/${match[1]}/postings`, collection: true };
+  }
+  if ((host === "jobs.lever.co" || host === "jobs.eu.lever.co") && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
+    return { kind: "lever", tenantKey: match[1] ?? "", url: `${url.origin}/${match[1]}`, collection: true };
+  }
+  if (host === "jobs.ashbyhq.com" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
+    return { kind: "ashby", tenantKey: match[1] ?? "", url: `https://jobs.ashbyhq.com/${match[1]}`, collection: true };
+  }
   if (host.endsWith("myworkdayjobs.com")) {
     return { kind: "workday", tenantKey: host, url: url.origin + url.pathname, collection: true };
   }
@@ -158,6 +173,16 @@ function extractCandidateLinks(html: string, base: URL): string[] {
     if (detectSource(url.toString()) !== null || /job|career|recruit|採用|求人|募集|entry/i.test(label)) output.add(url.toString());
   });
   return [...output].slice(0, 100);
+}
+
+function extractEmbeddedSourceUrls(html: string): string[] {
+  const patterns = [
+    /https?:\/\/(?:jobs|careers)\.smartrecruiters\.com\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
+    /https?:\/\/jobs\.lever\.co\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
+    /https?:\/\/jobs\.ashbyhq\.com\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
+  ];
+  return [...new Set(patterns.flatMap((pattern) => [...html.matchAll(pattern)].map((match) => match[0])))]
+    .slice(0, 100);
 }
 
 function stableRecordKey(url: URL): string {

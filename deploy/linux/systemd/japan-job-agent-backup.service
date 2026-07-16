@@ -1,0 +1,9 @@
+[Unit]
+Description=Japan Job Agent PostgreSQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/japan-job-agent
+ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml --profile maintenance run --rm backup

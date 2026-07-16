@@ -1,11 +1,14 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import pg, { type QueryResultRow } from "pg";
+import { Kysely, PostgresDialect } from "kysely";
+import type { OutboxDatabase } from "../../../packages/db/src/outbox.js";
 
 const { Pool } = pg;
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   private readonly pool = new Pool({ connectionString: requiredDatabaseUrl() });
+  readonly kysely = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: this.pool }) });
 
   query<T extends QueryResultRow>(text: string, values: readonly unknown[] = []) {
     return this.pool.query<T>(text, [...values]);
@@ -28,7 +31,7 @@ export class DatabaseService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.pool.end();
+    await this.kysely.destroy();
   }
 }
 
@@ -37,4 +40,3 @@ function requiredDatabaseUrl(): string {
   if (value === undefined) throw new Error("DATABASE_URL is required for the API");
   return value;
 }
-

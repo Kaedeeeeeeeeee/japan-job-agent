@@ -3,14 +3,17 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import pg from "pg";
 import { buildSafeProfile, type ProfilePolicy } from "../packages/profile/src/build-profile.js";
+import { createAiProviderFromEnv } from "../packages/ai/src/ai-provider.js";
+import { aiTaskIdempotencyKey } from "../packages/ai/src/ai-task-service.js";
 
 const resumePath = process.env.RESUME_PATH ?? "/Users/user/resume/resume_ja.html";
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) throw new Error("DATABASE_URL is required");
 const raw = await fs.readFile(resumePath);
-const policy = JSON.parse(await fs.readFile(path.resolve("config/profile-policy.json"), "utf8")) as ProfilePolicy;
+const policyRaw = await fs.readFile(path.resolve("config/profile-policy.json"), "utf8");
+const policy = JSON.parse(policyRaw) as ProfilePolicy;
 const profile = buildSafeProfile(raw.toString("utf8"), policy);
-const fingerprint = createHash("sha256").update(raw).digest("hex");
+const fingerprint = createHash("sha256").update(raw).update("\0").update(policyRaw).digest("hex");
 const { Client } = pg;
 const client = new Client({ connectionString: databaseUrl });
 await client.connect();
@@ -34,6 +37,15 @@ try {
     reused = false;
   }
   await client.query("UPDATE profiles SET current_version_id=$1,updated_at=now() WHERE id=$2", [versionId, profileId]);
+  const provider = createAiProviderFromEnv();
+  if (provider !== null && process.env.SEMANTIC_RETRIEVAL_ENABLED === "true") {
+    const idempotencyKey = aiTaskIdempotencyKey("profile_embedding", [fingerprint, provider.embeddingModelKey, "profile-embedding-v1"]);
+    await client.query(`INSERT INTO ai_tasks(
+        task_kind,idempotency_key,payload,provider_key,model_key
+      ) VALUES ('profile_embedding',$1,$2::jsonb,$3,$4)
+      ON CONFLICT(idempotency_key) DO NOTHING`, [idempotencyKey,
+      JSON.stringify({ profileVersionId: versionId, sourceFingerprint: fingerprint }), provider.providerKey, provider.embeddingModelKey]);
+  }
   await client.query("COMMIT");
   const outputPath = path.resolve(".data/profile/primary.json");
   await fs.mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
@@ -47,4 +59,3 @@ try {
 } finally {
   await client.end();
 }
-

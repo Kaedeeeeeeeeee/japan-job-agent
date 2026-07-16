@@ -15,6 +15,15 @@ describe("recruitment entrypoint audit", () => {
     expect(detectSource("https://open.talentio.com/r/1/c/acme/homes/4042")).toMatchObject({
       kind: "talentio", tenantKey: "acme", url: "https://open.talentio.com/r/1/c/acme/homes/4042",
     });
+    expect(detectSource("https://jobs.smartrecruiters.com/acme/123-engineer")).toMatchObject({
+      kind: "smartrecruiters", tenantKey: "acme",
+    });
+    expect(detectSource("https://careers.smartrecruiters.com/BoschGroup/japan")).toEqual({
+      kind: "smartrecruiters", tenantKey: "BoschGroup",
+      url: "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings", collection: true,
+    });
+    expect(detectSource("https://jobs.lever.co/acme/123")).toMatchObject({ kind: "lever", tenantKey: "acme" });
+    expect(detectSource("https://jobs.ashbyhq.com/acme/123")).toMatchObject({ kind: "ashby", tenantKey: "acme" });
     expect(detectSource("https://example.com/recruit")).toBeNull();
   });
 
@@ -28,6 +37,17 @@ describe("recruitment entrypoint audit", () => {
     expect(calls).toBe(1);
     expect(audit.status).toBe("fetched");
     expect(audit.detectedSources.map((source) => source.kind).sort()).toEqual(["hrmos", "schema_org"]);
+  });
+
+  it("detects an ATS tenant embedded in an official career-page script", async () => {
+    const audit = await auditRecruitmentEntrypoint("https://careers.example.com/", async () => new Response(
+      `<script>window.regions={jp:"https://careers.smartrecruiters.com/BoschGroup/japan"}</script>`,
+      { status: 200 },
+    ), async () => ["203.0.113.20"]);
+    expect(audit.detectedSources).toContainEqual({
+      kind: "smartrecruiters", tenantKey: "BoschGroup",
+      url: "https://api.smartrecruiters.com/v1/companies/BoschGroup/postings", collection: true,
+    });
   });
 
   it("blocks a private redirect target before requesting it", async () => {

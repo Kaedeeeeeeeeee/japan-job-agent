@@ -3,6 +3,7 @@ import path from "node:path";
 import pg from "pg";
 import type { SafeProfile } from "../packages/profile/src/build-profile.js";
 import { evaluateJob } from "../packages/matching/src/evaluate-job.js";
+import { DeterministicJobParser } from "../packages/parser/src/deterministic-job-parser.js";
 
 interface JobRow {
   canonical_job_id: string; canonical_job_version_id: string; lifecycle_state: "active" | "suspect" | "closed";
@@ -15,6 +16,7 @@ const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) throw new Error("DATABASE_URL is required");
 const { Client } = pg;
 const client = new Client({ connectionString: databaseUrl });
+const parserVersion = new DeterministicJobParser().parserVersion;
 await client.connect();
 try {
   const profile = await client.query<{ structured_profile: SafeProfile }>(`SELECT pv.structured_profile FROM profiles p
@@ -48,7 +50,7 @@ try {
     JOIN source_job_records r ON r.source_instance_id=s.id AND r.lifecycle_state='active'
     WHERE s.verification_state='verified' GROUP BY s.source_kind ORDER BY s.source_kind`);
   const extraction = await client.query<{ succeeded: number }>(`SELECT count(*)::int succeeded FROM source_job_extractions
-    WHERE parser_key='deterministic-job' AND parser_version='1.6.0' AND status='succeeded'`);
+    WHERE parser_key='deterministic-job' AND parser_version=$1 AND status='succeeded'`, [parserVersion]);
   const facts = await client.query<{ non_unknown_facts: number; missing_evidence: number }>(`WITH facts AS (
     SELECT v.id,f.field FROM canonical_jobs c JOIN canonical_job_versions v ON v.id=c.current_version_id
     CROSS JOIN LATERAL (VALUES ('employmentTypes',v.structured_result->'employmentTypes'->>'state'),
@@ -64,15 +66,15 @@ try {
     generatedAt: new Date().toISOString(), activeCanonicalJobs: jobs.rows.filter((row) => row.lifecycle_state === "active").length,
     eligibleForPrimaryProfile: matches.filter((row) => row.result.eligible).length,
     hardRejected: matches.filter((row) => !row.result.eligible).length,
-    sourceCounts: sources.rows, eligibleBySource, parser: { version: "1.6.0", succeeded: extraction.rows[0]?.succeeded ?? 0 },
+    sourceCounts: sources.rows, eligibleBySource, parser: { version: parserVersion, succeeded: extraction.rows[0]?.succeeded ?? 0 },
     evidence: facts.rows[0] ?? { non_unknown_facts: 0, missing_evidence: 0 },
     greenhouse: greenhouse.map((row) => ({ tenantKey: row.tenantKey, companyName: row.companyName,
       activeJobCount: row.activeJobCount, japanJobCount: row.japanJobCount, status: row.status })),
   };
-  await fs.writeFile(path.resolve("config/job-corpus-audit-2026-07-14.json"), `${JSON.stringify(payload, null, 2)}\n`);
+  await fs.writeFile(path.resolve("config/job-corpus-audit-2026-07-15.json"), `${JSON.stringify(payload, null, 2)}\n`);
   const sourceRows = sources.rows.map((row) => `| ${row.source_kind} | ${row.sources} | ${row.jobs} |`).join("\n");
   const eligibleRows = eligibleBySource.map((row) => `| ${row.sourceKind} | ${row.jobs} |`).join("\n");
-  const markdown = `# Job corpus expansion audit — 2026-07-14
+  const markdown = `# Job corpus expansion audit — 2026-07-15
 
 The verified corpus contains ${payload.activeCanonicalJobs} active Canonical Jobs. With the real PII-free primary Profile and deterministic hard filters, ${payload.eligibleForPrimaryProfile} are recommendation-eligible and ${payload.hardRejected} are explicitly excluded.
 
@@ -92,7 +94,7 @@ Parser ${payload.parser.version} succeeded for ${payload.parser.succeeded} curre
 
 Global Greenhouse boards are retained as complete authoritative snapshots. Explicit non-Japan locations are deterministically hard-rejected; unknown locations remain visible as unknown, consistent with the product policy.
 `;
-  await fs.writeFile(path.resolve("docs/delivery/job-corpus-expansion-2026-07-14.md"), markdown);
+  await fs.writeFile(path.resolve("docs/delivery/job-corpus-expansion-2026-07-15.md"), markdown);
   process.stdout.write(`${JSON.stringify({ active: payload.activeCanonicalJobs, eligible: payload.eligibleForPrimaryProfile,
     hardRejected: payload.hardRejected, sources: sources.rows.length })}\n`);
 } finally {

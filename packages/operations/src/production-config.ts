@@ -13,9 +13,18 @@ const requiredByService: Record<ProductionService, string[]> = {
   temporal: ["DB", "POSTGRES_SEEDS", "POSTGRES_USER", "POSTGRES_PWD", "DBNAME", "VISIBILITY_DBNAME"],
 };
 
+const linuxRequiredByService: Record<ProductionService, string[]> = {
+  api: ["DATABASE_URL", "API_INTERNAL_TOKEN"],
+  web: ["API_BASE_URL", "API_INTERNAL_TOKEN", "AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET", "ALLOWED_GITHUB_LOGIN", "AUTH_URL"],
+  worker: ["DATABASE_URL", "RAW_STORAGE_PATH", "TEMPORAL_ADDRESS"],
+  backup: ["DATABASE_URL", "BACKUP_OUTPUT_PATH"],
+  temporal: ["DB", "POSTGRES_SEEDS", "POSTGRES_USER", "POSTGRES_PWD"],
+};
+
 export function validateProductionConfig(service: ProductionService, env: Readonly<Record<string, string | undefined>>): ProductionConfigIssue[] {
   const issues: ProductionConfigIssue[] = [];
-  for (const variable of requiredByService[service]) {
+  const deploymentTarget = env.DEPLOYMENT_TARGET === "linux" ? "linux" : "railway";
+  for (const variable of (deploymentTarget === "linux" ? linuxRequiredByService : requiredByService)[service]) {
     if (blank(env[variable])) issues.push({ variable, problem: "is required" });
   }
   if (["api", "web"].includes(service)) requireLength(issues, env, "API_INTERNAL_TOKEN", 32);
@@ -24,8 +33,10 @@ export function validateProductionConfig(service: ProductionService, env: Readon
     if (!blank(env.ALLOWED_GITHUB_LOGIN) && env.ALLOWED_GITHUB_LOGIN !== "Kaedeeeeeeeeee") {
       issues.push({ variable: "ALLOWED_GITHUB_LOGIN", problem: "must equal Kaedeeeeeeeeee" });
     }
-    if (!blank(env.API_BASE_URL) && !/^http:\/\/api\.railway\.internal(?::\d+)?$/u.test(env.API_BASE_URL ?? "")) {
-      issues.push({ variable: "API_BASE_URL", problem: "must use the private api.railway.internal address" });
+    const allowedApiBase = deploymentTarget === "linux" ? /^http:\/\/api(?::\d+)?$/u : /^http:\/\/api\.railway\.internal(?::\d+)?$/u;
+    if (!blank(env.API_BASE_URL) && !allowedApiBase.test(env.API_BASE_URL ?? "")) {
+      issues.push({ variable: "API_BASE_URL", problem: deploymentTarget === "linux"
+        ? "must use the private Compose api service address" : "must use the private api.railway.internal address" });
     }
   }
   if (["api", "worker", "backup"].includes(service) && !blank(env.DATABASE_URL)) {
@@ -34,14 +45,32 @@ export function validateProductionConfig(service: ProductionService, env: Readon
   if (["api", "worker", "backup"].includes(service) && !blank(env.S3_ENDPOINT)) {
     checkUrl(issues, "S3_ENDPOINT", env.S3_ENDPOINT ?? "", ["https:"]);
   }
-  if (service === "worker" && !blank(env.TEMPORAL_ADDRESS)
-    && !/\.railway\.internal:7233$/u.test(env.TEMPORAL_ADDRESS ?? "")) {
-    issues.push({ variable: "TEMPORAL_ADDRESS", problem: "must use a private Railway address on port 7233" });
+  if (["api", "worker"].includes(service) && ["AI_ENRICHMENT_ENABLED", "SEMANTIC_RETRIEVAL_ENABLED", "AI_EXPLANATIONS_ENABLED"]
+    .some((name) => env[name] === "true")) {
+    for (const variable of ["AI_BASE_URL", "AI_API_KEY", "AI_EXTRACTION_MODEL", "AI_EMBEDDING_MODEL", "AI_EXPLANATION_MODEL"]) {
+      if (blank(env[variable])) issues.push({ variable, problem: "is required when an AI feature is enabled" });
+    }
+    if (!blank(env.AI_BASE_URL)) checkUrl(issues, "AI_BASE_URL", env.AI_BASE_URL ?? "", ["https:"]);
+  }
+  if (service === "worker" && !blank(env.TEMPORAL_ADDRESS)) {
+    const allowedTemporal = deploymentTarget === "linux" ? /^temporal:7233$/u : /\.railway\.internal:7233$/u;
+    if (!allowedTemporal.test(env.TEMPORAL_ADDRESS ?? "")) issues.push({ variable: "TEMPORAL_ADDRESS",
+      problem: deploymentTarget === "linux" ? "must use temporal:7233 inside Compose"
+        : "must use a private Railway address on port 7233" });
+  }
+  if (deploymentTarget === "linux" && service === "worker" && !blank(env.RAW_STORAGE_PATH)
+    && !env.RAW_STORAGE_PATH?.startsWith("/")) issues.push({ variable: "RAW_STORAGE_PATH", problem: "must be an absolute mounted path" });
+  if (deploymentTarget === "linux" && ["api", "worker", "backup"].includes(service) && !blank(env.DATABASE_URL)) {
+    try {
+      if (new URL(env.DATABASE_URL ?? "").hostname !== "postgres") {
+        issues.push({ variable: "DATABASE_URL", problem: "must use the private Compose postgres host" });
+      }
+    } catch { /* checkUrl reports the malformed URL. */ }
   }
   if (service === "temporal") {
     if (!blank(env.DB) && env.DB !== "postgres12") issues.push({ variable: "DB", problem: "must equal postgres12" });
-    if (!blank(env.DBNAME) && env.DBNAME !== "temporal") issues.push({ variable: "DBNAME", problem: "must equal temporal" });
-    if (!blank(env.VISIBILITY_DBNAME) && env.VISIBILITY_DBNAME !== "temporal_visibility") {
+    if (deploymentTarget === "railway" && !blank(env.DBNAME) && env.DBNAME !== "temporal") issues.push({ variable: "DBNAME", problem: "must equal temporal" });
+    if (deploymentTarget === "railway" && !blank(env.VISIBILITY_DBNAME) && env.VISIBILITY_DBNAME !== "temporal_visibility") {
       issues.push({ variable: "VISIBILITY_DBNAME", problem: "must equal temporal_visibility" });
     }
   }

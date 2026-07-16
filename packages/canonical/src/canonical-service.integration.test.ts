@@ -67,6 +67,21 @@ integration("Canonical strong-rule materialization", () => {
     const second = await service.materialize(b.extractionId);
     expect(second).toMatchObject({ canonicalJobId: first.canonicalJobId, mergedBy: "posting_id" });
   });
+
+  it("creates one actionable field review when deterministic high-risk facts remain unresolved", async () => {
+    const item = await fixture(db, "manual", "Unresolved workplace", `https://example.com/jobs/${randomUUID()}`);
+    await sql`UPDATE source_job_extractions SET structured_result=jsonb_set(structured_result,'{locations}',
+      '{"state":"unknown","values":[],"unknownReason":"not_parsed"}'::jsonb)
+      WHERE id=${item.extractionId}::uuid`.execute(db);
+    const service = new CanonicalService(db, { enrichmentEnabled: false });
+    const first = await service.materialize(item.extractionId);
+    await service.materialize(item.extractionId);
+    const result = await sql<{ readiness: string; reviews: number }>`SELECT version.readiness::text,
+      (SELECT count(*)::int FROM field_review_tasks task WHERE task.extraction_id=${item.extractionId}::uuid
+        AND task.field_name='locations') reviews
+      FROM canonical_job_versions version WHERE version.id=${first.canonicalJobVersionId}::uuid`.execute(db);
+    expect(result.rows[0]).toEqual({ readiness: "needs_review", reviews: 1 });
+  });
 });
 
 async function fixture(
@@ -96,6 +111,10 @@ async function fixture(
   await sql`INSERT INTO source_job_extractions(id,source_job_version_id,parser_key,parser_version,schema_version,status,
     structured_result,extraction_hash,completed_at) VALUES (${extractionId}::uuid,${versionId}::uuid,'fixture','1','job-v1','succeeded',
     ${JSON.stringify(structured)}::jsonb,${"c".repeat(64)},now())`.execute(db);
+  await sql`INSERT INTO source_job_extraction_lineage(extraction_id,origin)
+    VALUES (${extractionId}::uuid,'deterministic')`.execute(db);
+  await sql`INSERT INTO source_job_extraction_heads(source_job_record_id,source_job_version_id,extraction_id)
+    VALUES (${recordId}::uuid,${versionId}::uuid,${extractionId}::uuid)`.execute(db);
   await sql`INSERT INTO evidence(kind,source_job_extraction_id,field_path,quoted_text,source_url,locator)
     VALUES ('field_quote',${extractionId}::uuid,'employmentTypes','正社員',${url},'{}'::jsonb)`.execute(db);
   return { sourceId, recordId, extractionId };

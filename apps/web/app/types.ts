@@ -21,6 +21,34 @@ export interface ScoreDimension {
   rationale: string;
 }
 
+export interface OccupationSelectionView {
+  family: string;
+  familyLabel: string;
+  role: string;
+  roleLabel: string;
+}
+
+export interface OccupationClassificationView {
+  taxonomyVersion: string;
+  primary: OccupationSelectionView;
+  secondary: OccupationSelectionView[];
+  specialtyTags: string[];
+  confidence: "high" | "medium" | "low";
+}
+
+export interface OccupationFacetView {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface JobDateFactView {
+  state: "known" | "unknown" | "conflicting";
+  value: string | null;
+  precision: "date" | "datetime" | null;
+  evidenceIds: string[];
+}
+
 export interface JobView {
   canonicalJobId: string;
   canonicalJobVersionId: string;
@@ -30,7 +58,32 @@ export interface JobView {
   sourceKind: string;
   sourceKey: string;
   fetchedAt: string;
+  occupation: OccupationClassificationView;
+  dates: {
+    published: JobDateFactView;
+    sourceUpdated: JobDateFactView;
+    validThrough: JobDateFactView;
+    firstSeenAt: string;
+    lastSeenAt: string;
+    fetchedAt: string;
+    display: { kind: "published" | "first_seen"; value: string };
+  };
   sourceHealth: string;
+  readiness: "ready" | "pending_enrichment" | "needs_review";
+  readinessReasons: string[];
+  fieldStates: Record<string, {
+    state: "known" | "unknown" | "conflicting";
+    unknownReason: string | null;
+    processing: boolean;
+  }>;
+  explanation: {
+    status: "deterministic" | "pending" | "succeeded" | "failed";
+    source: "deterministic" | "ai";
+    summary: string | null;
+    matched: ExplanationItem[] | null;
+    gaps: ExplanationItem[] | null;
+    error: string | null;
+  };
   eligible: boolean;
   score: number;
   scoreBreakdown: ScoreDimension[];
@@ -51,6 +104,10 @@ export interface JobView {
 export interface JobsResponse {
   profileConfigured: boolean;
   rankingVersion?: string;
+  retrievalVersion?: string;
+  embeddingModelKey?: string | null;
+  occupationTaxonomyVersion?: string;
+  facets?: { occupations: OccupationFacetView[] };
   recommendationRunId?: string;
   generatedAt?: string;
   total?: number;

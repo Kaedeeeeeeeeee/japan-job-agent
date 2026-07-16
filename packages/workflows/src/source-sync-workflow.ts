@@ -1,5 +1,5 @@
 import { proxyActivities } from "@temporalio/workflow";
-import type { finalizeRefreshFailureActivity, runSourcePipelineActivity } from "../../worker/src/activities.js";
+import type { finalizeRefreshFailureActivity, processAiTasksActivity, runSourcePipelineActivity } from "../../worker/src/activities.js";
 
 const { runSourcePipelineActivity: runPipeline } = proxyActivities<{
   runSourcePipelineActivity: typeof runSourcePipelineActivity;
@@ -28,4 +28,15 @@ export async function sourceSyncWorkflow(input: SourceSyncWorkflowInput) {
     }
     throw error;
   }
+}
+
+const { processAiTasksActivity: processAiTasks } = proxyActivities<{
+  processAiTasksActivity: typeof processAiTasksActivity;
+}>({
+  startToCloseTimeout: "10 minutes",
+  retry: { initialInterval: "10 seconds", backoffCoefficient: 2, maximumInterval: "2 minutes", maximumAttempts: 3 },
+});
+
+export async function aiTaskSweepWorkflow() {
+  return processAiTasks();
 }

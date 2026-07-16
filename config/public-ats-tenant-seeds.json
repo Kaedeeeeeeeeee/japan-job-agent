@@ -1,0 +1,33 @@
+[
+  {
+    "kind": "smartrecruiters",
+    "tenantKey": "BoschGroup",
+    "companyName": "Bosch Group",
+    "officialReferrerUrl": "https://www.bosch.com/careers/job-offers/"
+  },
+  {
+    "kind": "smartrecruiters",
+    "tenantKey": "NielsenIQ",
+    "companyName": "NIQ"
+  },
+  {
+    "kind": "lever",
+    "tenantKey": "binance",
+    "companyName": "Binance"
+  },
+  {
+    "kind": "ashby",
+    "tenantKey": "OpenAI",
+    "companyName": "OpenAI"
+  },
+  {
+    "kind": "ashby",
+    "tenantKey": "perplexity",
+    "companyName": "Perplexity"
+  },
+  {
+    "kind": "ashby",
+    "tenantKey": "cursor",
+    "companyName": "Cursor"
+  }
+]

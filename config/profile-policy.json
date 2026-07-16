@@ -2,9 +2,11 @@
   "schemaVersion": "profile-v1",
   "targetChannels": ["new_grad_2027", "junior_midcareer"],
   "rolePriorities": [
-    { "group": "product_web_ai_engineering", "weight": 1 },
-    { "group": "ios_engineering", "weight": 0.7 },
-    { "group": "unity_game_engineering", "weight": 0.4 }
+    { "group": "general_office_administration", "weight": 1 },
+    { "group": "academic_affairs_school_operations", "weight": 0.9 },
+    { "group": "human_resources_recruiting", "weight": 0.8 },
+    { "group": "trade_international_office", "weight": 0.7 },
+    { "group": "interpreter_translator", "weight": 0.7 }
   ],
   "locations": {
     "accepted": ["tokyo_metropolitan_area", "remote_within_japan"],
@@ -18,7 +20,7 @@
   "languages": [
     { "code": "ja", "level": "JLPT N1" },
     { "code": "zh", "level": "native" },
-    { "code": "en", "level": "TOEIC 680" }
+    { "code": "en", "level": "TOEIC 710" }
   ],
   "visa": {
     "currentStatus": "not_stored_in_repository",
@@ -31,4 +33,3 @@
     "unknownIsEligible": true
   }
 }
-

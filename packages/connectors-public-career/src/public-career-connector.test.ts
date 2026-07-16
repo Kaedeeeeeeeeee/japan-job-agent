@@ -24,6 +24,9 @@ describe("public career connectors", () => {
   ] as const)("only finalizes a complete %s collection after detail fetches", async (kind, baseUrl, listing, detailSuffix) => {
     let details = 0;
     const connector = new PublicCareerConnector(kind, async (input) => {
+      if (kind === "talentio" && String(input) === "https://open.talentio.com/sitemap.xml") {
+        return response('<?xml version="1.0"?><urlset><url><loc>https://open.talentio.com/r/1/c/acme/pages/789</loc></url></urlset>');
+      }
       if (String(input).endsWith(detailSuffix)) {
         details += 1;
         return response("<html><h1>Engineer</h1><main>Current official role with enough deterministic detail text for parsing.</main></html>");

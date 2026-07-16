@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { Kysely, PostgresDialect, sql } from "kysely";
+import { Kysely, PostgresDialect, sql, type Transaction } from "kysely";
 import pg from "pg";
 import { CanonicalService } from "../packages/canonical/src/canonical-service.js";
 import { HrmosConnector } from "../packages/connectors-hrmos/src/hrmos-connector.js";
@@ -233,7 +233,7 @@ function isRecruitmentPlatform(host: string): boolean {
   return /(^|\.)(hrmos\.co|herp\.careers|jobcan\.jp|talentio\.com|en-gage\.net|wantedly\.com|arwrk\.net|jbplt\.jp)$/.test(host);
 }
 
-async function insertDiscoveryEvidence(trx: Parameters<Parameters<typeof db.transaction>[0]>[0], candidateId: string,
+async function insertDiscoveryEvidence(trx: Transaction<OutboxDatabase>, candidateId: string,
   type: string, sourceUrl: string, targetUrl: string | null, quote: string, observedAt: string): Promise<void> {
   await sql`INSERT INTO company_discovery_evidence(company_discovery_candidate_id,evidence_type,source_url,target_url,quoted_text,locator,observed_at)
     VALUES (${candidateId}::uuid,${type},${sourceUrl},${targetUrl},${quote},${JSON.stringify({ href: targetUrl })}::jsonb,${observedAt}::timestamptz)

@@ -9,14 +9,13 @@ const limit = Number(process.argv[2] ?? 2_000);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 try {
-  const pending = await sql<{ extraction_id: string }>`SELECT DISTINCT ON (r.id) e.id AS extraction_id
-    FROM source_job_records r JOIN source_job_versions v ON v.source_job_record_id=r.id
-    JOIN source_job_extractions e ON e.source_job_version_id=v.id
+  const pending = await sql<{ extraction_id: string }>`SELECT head.extraction_id
+    FROM source_job_records r JOIN source_job_extraction_heads head ON head.source_job_record_id=r.id
     JOIN source_instances s ON s.id=r.source_instance_id
-    WHERE e.status='succeeded' AND r.lifecycle_state='active' AND s.verification_state='verified'
+    WHERE r.lifecycle_state='active' AND s.verification_state='verified'
     AND EXISTS (SELECT 1 FROM company_source_relationships csr WHERE csr.source_instance_id=s.id
       AND csr.verification_state='verified' AND csr.valid_to IS NULL)
-    ORDER BY r.id,e.completed_at DESC LIMIT ${limit}`.execute(db);
+    ORDER BY r.id LIMIT ${limit}`.execute(db);
   const service = new CanonicalService(db);
   let created = 0;
   let reused = 0;
@@ -31,4 +30,3 @@ try {
 } finally {
   await db.destroy();
 }
-

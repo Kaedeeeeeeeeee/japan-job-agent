@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh Japan Job Agent Discovery candidates
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/japan-job-agent
+TimeoutStartSec=4h
+ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:sitemaps

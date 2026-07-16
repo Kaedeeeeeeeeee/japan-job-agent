@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Japan Job Agent verified promotion timer
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

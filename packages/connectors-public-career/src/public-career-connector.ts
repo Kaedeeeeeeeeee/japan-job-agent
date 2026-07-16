@@ -6,11 +6,14 @@ export type PublicCareerKind = "herp" | "jobcan" | "airwork" | "engage" | "talen
 interface IndexedRecord { externalId: string; url: string }
 
 export class PublicCareerConnector implements SourceConnector {
+  private talentioSitemap: Promise<{ records: IndexedRecord[]; metadata: ResponseMetadata }> | undefined;
+
   constructor(readonly kind: PublicCareerKind, private readonly fetchImplementation: typeof fetch = fetch,
     private readonly maximumBytes = 5 * 1024 * 1024) {}
 
   async fetchCollectionPage(request: CollectionPageRequest): Promise<CollectionPage> {
     if (request.cursor !== undefined) throw new ConnectorError("pagination_interrupted", `${this.kind} connector is internally paginated`, false);
+    if (this.kind === "talentio") return this.fetchTalentioCollection(request);
     const collectionUrl = new URL(request.source.baseUrl);
     assertAllowedHost(this.kind, collectionUrl);
     const indexPages = [await this.fetchBytes(collectionUrl, request.signal)];
@@ -29,6 +32,37 @@ export class PublicCareerConnector implements SourceConnector {
       jobs.push(toDiscoveredJob(request.source.id, record, detail.bytes, detail.metadata));
     }
     return { jobs, isLastPage: true, providerTotal: jobs.length, response: indexPages[0]?.metadata ?? emptyMetadata(collectionUrl) };
+  }
+
+  private async fetchTalentioCollection(request: CollectionPageRequest): Promise<CollectionPage> {
+    this.talentioSitemap ??= this.fetchTalentioSitemap(request.signal);
+    const sitemap = await this.talentioSitemap;
+    const tenant = request.source.tenantKey;
+    const records = sitemap.records.filter((record) => new URL(record.url).pathname.startsWith(`/r/1/c/${tenant}/pages/`));
+    const jobs: DiscoveredJob[] = [];
+    for (const record of records) {
+      const detail = await this.fetchBytes(new URL(record.url), request.signal);
+      jobs.push(toDiscoveredJob(request.source.id, record, detail.bytes, detail.metadata));
+    }
+    return { jobs, isLastPage: true, providerTotal: records.length, response: sitemap.metadata };
+  }
+
+  private async fetchTalentioSitemap(signal: AbortSignal): Promise<{ records: IndexedRecord[]; metadata: ResponseMetadata }> {
+    const sitemap = await this.fetchBytes(new URL("https://open.talentio.com/sitemap.xml"), signal);
+    const records = new Map<string, IndexedRecord>();
+    const $ = load(new TextDecoder().decode(sitemap.bytes), { xmlMode: true });
+    $("url > loc").each((_index, element) => {
+      const raw = $(element).text().trim();
+      if (raw === "") return;
+      const url = new URL(raw);
+      const match = url.hostname === "open.talentio.com"
+        ? url.pathname.match(/^\/r\/1\/c\/([^/]+)\/pages\/(\d+)\/?$/) : null;
+      const tenant = match?.[1];
+      const externalId = match?.[2];
+      if (tenant === undefined || externalId === undefined) return;
+      records.set(`${tenant}:${externalId}`, { externalId, url: `https://open.talentio.com/r/1/c/${tenant}/pages/${externalId}` });
+    });
+    return { records: [...records.values()], metadata: sitemap.metadata };
   }
 
   async fetchRecord(identity: SourceJobIdentity, signal: AbortSignal): Promise<DiscoveredJob> {
@@ -115,7 +149,7 @@ function parseJobcanCategoryUrls(bytes: Uint8Array, tenantKey: string): string[]
 
 function toDiscoveredJob(sourceInstanceId: string, record: IndexedRecord, raw: Uint8Array, response: ResponseMetadata): DiscoveredJob {
   return { identity: { sourceInstanceId, stableKey: record.externalId, externalId: record.externalId, canonicalUrl: record.url },
-    recordUrl: record.url, raw: Uint8Array.from(raw), response };
+    recordUrl: record.url, raw: Uint8Array.from(raw), response, exactRecordResponse: true };
 }
 
 function assertAllowedHost(kind: PublicCareerKind, url: URL): void {

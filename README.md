@@ -101,7 +101,7 @@ DATABASE_URL=... pnpm acceptance:verify
 pnpm deploy:preflight -- web
 ```
 
-Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. Production preflight validates one of `api`, `web`, `worker`, `backup`, or `temporal` without printing values. See the [Railway deployment runbook](./deploy/railway/README.md) and [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
+Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Activity retries use persisted execution leases and the ingestion/extraction/materialization uniqueness contracts. Production preflight validates one of `api`, `web`, `worker`, `backup`, or `temporal` without printing values. The default private deployment is the [Linux + Tailscale runbook](./deploy/linux/README.md): PostgreSQL and raw objects stay on local disk, while GitHub Actions reaches only the readiness endpoint through an ephemeral tagged Tailscale identity. The [Railway deployment runbook](./deploy/railway/README.md) remains available as an alternative; see also the [Week 4 acceptance evidence](./docs/delivery/week4-ranking-ui-cloud.md).
 
 ## Company seed audit
 

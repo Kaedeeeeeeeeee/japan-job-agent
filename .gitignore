@@ -15,3 +15,7 @@ coverage/
 tmp/
 .data/
 .playwright-cli/
+
+# Generated local acceptance artifacts; keep job-level data out of Git.
+output/hybrid-parser-*.json
+output/playwright/occupation-filter-*.png

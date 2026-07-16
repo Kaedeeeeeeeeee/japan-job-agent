@@ -148,6 +148,7 @@ function toDiscoveredJob(
     recordUrl: item.url,
     raw: Uint8Array.from(raw),
     response,
+    exactRecordResponse: true,
   };
 }
 
