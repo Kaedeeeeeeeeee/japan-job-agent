@@ -104,7 +104,8 @@ export function detectSource(value: string): DetectedRecruitmentSource | null {
   if (host === "public.n-ats.hrmos.co" && (match = url.pathname.match(/^\/([^/]+)\/jobs\/([^/]+)/)) !== null) {
     return { kind: "schema_org", tenantKey: `n-ats:${match[1]}:${match[2]}`, url: url.toString(), collection: false };
   }
-  if ((host === "boards-api.greenhouse.io" || host === "job-boards.greenhouse.io") && (match = url.pathname.match(/\/(?:v1\/boards\/)?([^/]+)\/jobs/)) !== null) {
+  if ((host === "boards-api.greenhouse.io" || host === "job-boards.greenhouse.io" || host === "boards.greenhouse.io")
+    && (match = url.pathname.match(/\/(?:v1\/boards\/)?([^/]+)\/jobs/)) !== null) {
     return { kind: "greenhouse", tenantKey: match[1] ?? "", url: `https://boards-api.greenhouse.io/v1/boards/${match[1]}/jobs`, collection: true };
   }
   if (host === "herp.careers" && (match = url.pathname.match(/^\/v1\/([^/]+)/)) !== null) {

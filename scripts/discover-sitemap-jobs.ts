@@ -8,6 +8,7 @@ import pg from "pg";
 import type { JobDiscoveryLead } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
 import { JobDiscoveryService } from "../packages/discovery/src/job-discovery-service.js";
+import { engageEntryAction, parseEngageDiscoveryMode, type EngageDiscoveryMode } from "../packages/discovery/src/engage-discovery-mode.js";
 import {
   parseEngageDetail,
   parseSitemapEntries,
@@ -39,6 +40,8 @@ const engageMaxDetailsPerRun = positiveInteger(
   5_000,
 );
 const engageDetailConcurrency = Math.min(8, positiveInteger(process.env.ENGAGE_DISCOVERY_CONCURRENCY, 1));
+const engageDiscoveryMode = parseEngageDiscoveryMode(process.env.ENGAGE_DISCOVERY_MODE);
+const engageMaxSitemapFiles = positiveInteger(process.env.ENGAGE_SITEMAP_MAX_FILES_PER_RUN, 10_000);
 const enabled = new Set((process.env.SITEMAP_DISCOVERY_FAMILIES ?? "yolo_japan,talentio,engage")
   .split(",").map((value) => value.trim()).filter(Boolean));
 const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
@@ -69,6 +72,7 @@ try {
 
 interface CollectorReport {
   family: string;
+  discoveryMode?: EngageDiscoveryMode;
   maximumPerRun: number;
   concurrency?: number;
   processed: number;
@@ -274,6 +278,9 @@ async function runEngage(discoverySourceId: string): Promise<CollectorReport> {
   const indexUrl = "https://en-gage.net/sitemap_user_job_index.xml";
   const index = await throttle.fetch(indexUrl);
   const sitemapUrls = parseSitemapIndex(index, "en-gage.net").sort().reverse();
+  if (engageDiscoveryMode === "pause_new") {
+    return observeExistingEngageSitemaps(sitemapUrls, throttle);
+  }
   const known = await observationKeys("engage");
   const existingDatedIds = backfillWindow === null ? new Set<string>() : await datedExternalPostingIds("engage");
   const tombstones = await retentionDetailUrlHashes();
@@ -347,11 +354,64 @@ async function runEngage(discoverySourceId: string): Promise<CollectorReport> {
       }
     });
   }
-  return { family: "engage", maximumPerRun: engageMaxDetailsPerRun, concurrency: engageDetailConcurrency, processed,
+  return { family: "engage", discoveryMode: engageDiscoveryMode, maximumPerRun: engageMaxDetailsPerRun, concurrency: engageDetailConcurrency, processed,
     fetchedPages, parsedLeads, admitted, created,
     excludedUnknownPublication: excluded.unknownPublication, excludedOutsideWindow: excluded.outsideWindow,
     prefilteredBySitemapLastModified, failures,
     validAfter: await familyValidCount("engage") };
+}
+
+async function observeExistingEngageSitemaps(
+  sitemapUrls: string[],
+  throttle: { fetch: (url: string) => Promise<Uint8Array> },
+): Promise<CollectorReport> {
+  const existing = await engageCandidateIds();
+  const observedAt = new Date().toISOString();
+  const observationDate = observedAt.slice(0, 10);
+  let fetchedPages = 1;
+  let processed = 0;
+  let admitted = 0;
+  let failures = 0;
+  for (const sitemapUrl of sitemapUrls.slice(0, engageMaxSitemapFiles)) {
+    try {
+      const compressed = await throttle.fetch(sitemapUrl);
+      fetchedPages += 1;
+      const entries = parseSitemapEntries(maybeGunzip(compressed), "en-gage.net")
+        .filter((entry) => /^\/user\/search\/desc\/\d+\/?$/.test(new URL(entry.url).pathname));
+      for (const entry of entries) {
+        const externalId = new URL(entry.url).pathname.match(/\/(\d+)\/?$/)?.[1];
+        if (externalId === undefined) continue;
+        const candidateId = existing.get(externalId);
+        if (engageEntryAction("pause_new", candidateId !== undefined) !== "observe_existing" || candidateId === undefined) continue;
+        processed += 1;
+        const created = await discovery.observePresence({
+          candidateId,
+          observationKey: `engage:sitemap-presence:${externalId}:${entry.lastModified ?? "undated"}:${observationDate}`,
+          observedAt,
+          payloadHash: sha256(new TextEncoder().encode(`${entry.url}\n${entry.lastModified ?? ""}`)),
+          responseMetadata: { observationKind: "sitemap_presence_pause_new", sitemapUrl,
+            sitemapLastModified: entry.lastModified ?? null, discoveryMode: "pause_new" },
+        });
+        if (created) admitted += 1;
+      }
+    } catch (error) {
+      failures += 1;
+      progressError("engage-pause-new", sitemapUrl, error);
+    }
+    progress("engage-existing-sitemap-observations", processed, existing.size, fetchedPages);
+  }
+  return { family: "engage", discoveryMode: "pause_new", maximumPerRun: 0, concurrency: 1, processed,
+    fetchedPages, parsedLeads: 0, admitted, created: 0, excludedUnknownPublication: 0,
+    excludedOutsideWindow: 0, prefilteredBySitemapLastModified: 0, failures,
+    validAfter: await familyValidCount("engage") };
+}
+
+async function engageCandidateIds(): Promise<Map<string, string>> {
+  const result = await sql<{ id: string; external_posting_id: string }>`SELECT id,external_posting_id
+    FROM job_discovery_candidates WHERE source_family='engage' AND external_posting_id IS NOT NULL
+      AND state NOT IN ('rejected','expired')
+      AND content_purged_at IS NULL`.execute(db);
+  return new Map(result.rows.map((row) => [row.external_posting_id, row.id]));
 }
 
 function excludeFromBackfill(lead: JobDiscoveryLead, counts: WindowExclusions): boolean {

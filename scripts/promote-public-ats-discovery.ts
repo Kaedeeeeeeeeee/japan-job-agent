@@ -3,6 +3,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
+import { GreenhouseConnector } from "../packages/connectors-greenhouse/src/greenhouse-connector.js";
+import { HrmosConnector } from "../packages/connectors-hrmos/src/hrmos-connector.js";
+import { PublicCareerConnector } from "../packages/connectors-public-career/src/public-career-connector.js";
 import { CanonicalService } from "../packages/canonical/src/canonical-service.js";
 import {
   AshbyConnector,
@@ -20,12 +23,13 @@ import type {
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
 import { JobDiscoveryService } from "../packages/discovery/src/job-discovery-service.js";
 import { verifyOfficialSourceBacklink } from "../packages/discovery/src/official-source-backlink-verifier.js";
-import { publicAtsBaseUrl, type PublicAtsTenantSeed } from "../packages/discovery/src/public-ats-discovery.js";
 import { ExtractionService } from "../packages/extraction/src/extraction-service.js";
 import { SourceSyncService } from "../packages/ingestion/src/source-sync-service.js";
 import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
 import { DeterministicJobParser } from "../packages/parser/src/deterministic-job-parser.js";
 import { discoveryBackfillWindow } from "../packages/freshness/src/discovery-backfill-window.js";
+import { sourceCollectionUrl } from "../packages/source-expansion/src/tenant-scanner.js";
+import type { ExpansionSourceKind } from "../packages/source-expansion/src/tenant-artifact.js";
 import { createObjectStore } from "./object-store-config.js";
 
 interface CandidateRow {
@@ -38,6 +42,13 @@ interface SeededSource {
   sourceInstanceId: string;
   relationshipId: string;
   evidenceId: string;
+}
+
+interface PromotionTenantSeed {
+  kind: ExpansionSourceKind;
+  tenantKey: string;
+  companyName?: string;
+  officialReferrerUrl: string;
 }
 
 const databaseUrl = required("DATABASE_URL");
@@ -55,7 +66,7 @@ const reports: Array<Record<string, unknown>> = [];
 try {
   const seeds = (JSON.parse(await fs.readFile(path.resolve(
     process.env.PUBLIC_ATS_TENANT_FILE ?? "config/public-ats-tenant-seeds.json",
-  ), "utf8")) as PublicAtsTenantSeed[]).filter((seed) => seed.officialReferrerUrl !== undefined);
+  ), "utf8")) as PromotionTenantSeed[]).filter((seed) => seed.officialReferrerUrl !== undefined);
   let activeJobs = await verifiedActiveCanonicalCount();
   for (const seed of seeds) {
     if (activeJobs >= targetActiveJobs) break;
@@ -84,7 +95,7 @@ try {
     const source = await seedVerifiedRelationship(seed, candidates[0]!.company_name,
       verification.corporateUrl, verification.evidencePageUrl, verification.detectedSource.url);
     const sourceRef: SourceInstanceRef = { id: source.sourceInstanceId, sourceKind: seed.kind,
-      tenantKey: seed.tenantKey, baseUrl: publicAtsBaseUrl(seed.kind, seed.tenantKey) };
+      tenantKey: seed.tenantKey, baseUrl: sourceCollectionUrl(seed.kind, seed.tenantKey) };
     try {
       const allowedIds = new Set(candidates.map((candidate) => candidate.external_posting_id));
       const connector = candidateSubsetConnector(connectorFor(seed.kind, policyFetch), allowedIds);
@@ -102,6 +113,7 @@ try {
         continue;
       }
       await verifyPersistedSource(source);
+      await setScheduleInterval(source.sourceInstanceId, currentJobs);
       const materialized = await extractAndMaterialize(source.sourceInstanceId);
       const queued = await linkCandidates(seed, source, candidates);
       await drainPromotionQueue(`public-ats-promoter:${seed.kind}:${seed.tenantKey}`, 10_000);
@@ -138,14 +150,17 @@ function candidateSubsetConnector(inner: SourceConnector, allowedIds: ReadonlySe
   };
 }
 
-function connectorFor(kind: PublicAtsTenantSeed["kind"], fetchImplementation: typeof fetch): SourceConnector {
-  return kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
+function connectorFor(kind: ExpansionSourceKind, fetchImplementation: typeof fetch): SourceConnector {
+  return kind === "greenhouse" ? new GreenhouseConnector(fetchImplementation)
+    : kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
     : kind === "lever" ? new LeverConnector(fetchImplementation)
       : kind === "ashby" ? new AshbyConnector(fetchImplementation)
-        : new WorkdayConnector(fetchImplementation, 8 * 1024 * 1024, "Japan");
+        : kind === "workday" ? new WorkdayConnector(fetchImplementation, 8 * 1024 * 1024, "Japan")
+          : kind === "hrmos" ? new HrmosConnector(fetchImplementation)
+            : new PublicCareerConnector(kind, fetchImplementation);
 }
 
-async function seedVerifiedRelationship(seed: PublicAtsTenantSeed, fallbackCompanyName: string, corporateUrl: string,
+async function seedVerifiedRelationship(seed: PromotionTenantSeed, fallbackCompanyName: string, corporateUrl: string,
   evidencePageUrl: string, detectedSourceUrl: string): Promise<SeededSource> {
   const domain = new URL(corporateUrl).hostname.replace(/^www\./, "").toLowerCase();
   const displayName = seed.companyName ?? fallbackCompanyName;
@@ -161,7 +176,7 @@ async function seedVerifiedRelationship(seed: PublicAtsTenantSeed, fallbackCompa
       ON CONFLICT(company_id,domain) DO UPDATE SET is_official=true,verified_at=now(),
         verification_note=excluded.verification_note`.execute(trx);
     const sourceId = (await sql<{ id: string }>`INSERT INTO source_instances(source_kind,tenant_key,base_url,verification_state)
-      VALUES (${seed.kind},${seed.tenantKey},${publicAtsBaseUrl(seed.kind, seed.tenantKey)},'discovery')
+      VALUES (${seed.kind},${seed.tenantKey},${sourceCollectionUrl(seed.kind, seed.tenantKey)},'discovery')
       ON CONFLICT(source_kind,tenant_key) DO UPDATE SET base_url=excluded.base_url,updated_at=now() RETURNING id`.execute(trx)).rows[0]!.id;
     await sql`INSERT INTO source_policies(source_instance_id,allows_authoritative_snapshot,terms_reviewed_at,policy_notes)
       VALUES (${sourceId}::uuid,true,now(),'Public ATS API; Japan-filtered candidate subset; all provider pages consumed; 1 request/second host cap')
@@ -199,6 +214,10 @@ async function verifyPersistedSource(source: SeededSource): Promise<void> {
       SELECT id,${source.relationshipId}::uuid,now() FROM source_job_records
       WHERE source_instance_id=${source.sourceInstanceId}::uuid
       ON CONFLICT(source_job_record_id,company_source_relationship_id,valid_to) DO NOTHING`.execute(trx);
+    await sql`UPDATE canonical_jobs job SET lifecycle_state='active',updated_at=now()
+      FROM canonical_job_sources link JOIN source_job_records record ON record.id=link.source_job_record_id
+      WHERE link.canonical_job_id=job.id AND link.active_to IS NULL AND record.lifecycle_state='active'
+        AND record.source_instance_id=${source.sourceInstanceId}::uuid AND job.current_version_id IS NOT NULL`.execute(trx);
   });
 }
 
@@ -222,7 +241,7 @@ async function extractAndMaterialize(sourceInstanceId: string): Promise<{ extrac
   return { extracted, canonicalized };
 }
 
-async function linkCandidates(seed: PublicAtsTenantSeed, source: SeededSource, candidates: CandidateRow[]): Promise<number> {
+async function linkCandidates(seed: PromotionTenantSeed, source: SeededSource, candidates: CandidateRow[]): Promise<number> {
   const ids = candidates.map((candidate) => candidate.id);
   const matches = (await sql<{ candidate_id: string; source_job_record_id: string; application_url: string }>`SELECT
       candidate.id candidate_id,record.id source_job_record_id,version.application_url
@@ -242,6 +261,13 @@ async function linkCandidates(seed: PublicAtsTenantSeed, source: SeededSource, c
     }
   }
   return matches.length;
+}
+
+async function setScheduleInterval(sourceInstanceId: string, currentJobs: number): Promise<void> {
+  await sql`INSERT INTO source_schedules(source_instance_id,interval_hours,stale_refresh_allowed)
+    VALUES (${sourceInstanceId}::uuid,${currentJobs >= 100 ? 12 : 24},true)
+    ON CONFLICT(source_instance_id) DO UPDATE SET interval_hours=excluded.interval_hours,
+      stale_refresh_allowed=true,updated_at=now()`.execute(db);
 }
 
 async function drainPromotionQueue(workerId: string, budget: number): Promise<void> {
@@ -282,6 +308,7 @@ async function verifiedActiveCanonicalCount(): Promise<number> {
     JOIN source_instances source ON source.id=record.source_instance_id AND source.verification_state='verified'
     JOIN company_source_relationships relationship ON relationship.source_instance_id=source.id
       AND relationship.verification_state='verified' AND relationship.valid_to IS NULL
+    JOIN evidence ON evidence.company_source_relationship_id=relationship.id
     WHERE job.lifecycle_state='active'`.execute(db)).rows[0]?.count ?? 0;
 }
 

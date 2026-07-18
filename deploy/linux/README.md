@@ -33,11 +33,12 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now japan-job-agent-backup.timer
 sudo systemctl enable --now japan-job-agent-discovery-refresh.timer
 sudo systemctl enable --now japan-job-agent-public-ats-refresh.timer
+sudo systemctl enable --now japan-job-agent-source-expansion.timer
 sudo systemctl enable --now japan-job-agent-promotion.timer
 sudo systemctl enable --now japan-job-agent-freshness.timer
 ```
 
-The daily Discovery jobs search the newest Talentio, Engage, and YOLO Japan entries plus every persisted SmartRecruiters, Lever, Ashby, and Workday tenant without requiring GitHub search. The public-ATS refresh also performs the fail-closed, metadata-only Wantedly audit for the curated company list. The later promotion job is ordered after both Discovery refreshes and only advances candidates whose exact official Company–Source relationship can be verified, then reconciles Temporal schedules so newly verified sources enter the 12–24 hour formal sync cycle. At 08:30 JST, the freshness job excludes postings that cannot be proven to have been published in the last six calendar months, gives unknown publication dates a seven-day enrichment quarantine, and purges expired job content while retaining only identity fingerprints. Backups remain local by default; copy one encrypted backup to a second user-controlled disk for machine-loss recovery.
+The daily Discovery jobs search the newest Talentio, Engage, and YOLO Japan entries plus every persisted public ATS tenant. Set `ENGAGE_DISCOVERY_MODE=pause_new` to observe existing Engage IDs from its sitemap without fetching or saving new Engage details. The source-expansion timer is inert while `SOURCE_EXPANSION_ENABLED=false`; after a backup, migration, and artifact dry-run, set it to `true` to scan at most 400 ranked tenants with four workers, a one-request-per-second host cap, and strict 30-day publication filtering. The later promotion job only advances candidates whose exact official Company–Source relationship can be verified, then reconciles Temporal schedules so sources with at least 100 current jobs run every 12 hours and smaller sources every 24 hours. At 08:30 JST, freshness applies the six-month retention policy. Backups remain local by default; copy one encrypted backup to a second user-controlled disk for machine-loss recovery.
 
 Set repository variable `JJA_ENABLE_TAILSCALE_HEALTH=true` and secrets `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, and `JJA_TAILSCALE_HEALTH_URL` to enable the nightly private readiness check. A failed source audit or Tailscale health check opens (or comments on) the single `Nightly live health failed` GitHub issue, so repeated failures remain visible without creating one issue per day.
 

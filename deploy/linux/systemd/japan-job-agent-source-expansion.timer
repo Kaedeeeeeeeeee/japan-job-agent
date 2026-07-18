@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily ranked public ATS tenant scan timer
+
+[Timer]
+OnCalendar=*-*-* 06:20:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

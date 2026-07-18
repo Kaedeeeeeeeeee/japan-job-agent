@@ -1,0 +1,11 @@
+[Unit]
+Description=Scan ranked public ATS tenant candidates
+Requires=docker.service
+After=docker.service japan-job-agent-public-ats-refresh.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/japan-job-agent
+EnvironmentFile=-/opt/japan-job-agent/deploy/linux/.env
+TimeoutStartSec=4h
+ExecStart=/bin/sh -c 'test "$${SOURCE_EXPANSION_ENABLED:-false}" != true || exec /usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm source:scan-tenants --backfill-days auto --batch 400'

@@ -327,6 +327,32 @@ export class JobDiscoveryService {
     });
   }
 
+  async observePresence(input: {
+    candidateId: string;
+    observationKey: string;
+    observedAt: string;
+    payloadHash: string;
+    responseMetadata?: Record<string, unknown>;
+  }): Promise<boolean> {
+    if (!/^[0-9a-f]{64}$/.test(input.payloadHash)) throw new Error("Presence payload hash must be SHA-256");
+    return this.db.transaction().execute(async (trx) => {
+      const candidate = await this.loadCandidate(input.candidateId, trx);
+      const observation = await sql<{ id: string }>`INSERT INTO job_discovery_observations(
+          id,candidate_id,observation_key,source_url,outbound_url,raw_company_name,raw_title,
+          raw_location_text,payload_hash,response_metadata,observed_at
+        ) VALUES (${randomUUID()}::uuid,${candidate.id}::uuid,${input.observationKey},${candidate.detail_url},
+          ${candidate.official_url},${candidate.company_name},${candidate.title},${candidate.location_text},
+          ${input.payloadHash},${JSON.stringify(input.responseMetadata ?? {})}::jsonb,${input.observedAt}::timestamptz)
+        ON CONFLICT(candidate_id,observation_key) DO NOTHING RETURNING id`.execute(trx);
+      if (observation.rows[0] !== undefined) {
+        await sql`UPDATE job_discovery_candidates SET observation_count=observation_count+1,
+          last_seen_at=GREATEST(last_seen_at,${input.observedAt}::timestamptz),updated_at=now()
+          WHERE id=${candidate.id}::uuid`.execute(trx);
+      }
+      return observation.rows[0] !== undefined;
+    });
+  }
+
   async applyResolution(candidateId: string, resolution: CandidateResolution): Promise<string> {
     if (resolution.status === "retryable") {
       await sql`UPDATE job_discovery_candidates SET state='discovered',rejection_reason=${resolution.reason},updated_at=now()

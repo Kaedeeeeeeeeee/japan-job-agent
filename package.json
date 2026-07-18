@@ -28,6 +28,11 @@
     "discovery:audit-entrypoints": "tsx scripts/audit-recruitment-entrypoints.ts",
     "discovery:audit-candidates": "tsx scripts/audit-recruitment-candidates.ts",
     "discovery:public-ats": "tsx scripts/discover-public-ats.ts",
+    "source:harvest-tenants": "tsx scripts/harvest-source-tenants.ts",
+    "source:import-tenants": "tsx scripts/import-source-tenants.ts",
+    "source:scan-tenants": "tsx scripts/scan-source-tenants.ts",
+    "source:promote-ranked": "tsx scripts/promote-ranked-source-tenants.ts",
+    "source:clean-quality-debt": "tsx scripts/clean-source-quality-debt.ts",
     "discovery:wantedly": "tsx scripts/discover-wantedly.ts",
     "discovery:backfill-formal": "tsx scripts/backfill-formal-job-discovery.ts",
     "discovery:sitemaps": "tsx scripts/discover-sitemap-jobs.ts",
@@ -55,6 +60,7 @@
     "backup:restore-verify": "tsx scripts/verify-backup-restore.ts",
     "acceptance:verify": "tsx scripts/verify-final-acceptance.ts",
     "acceptance:discovery": "tsx scripts/verify-discovery-acceptance.ts",
+    "acceptance:source-expansion": "tsx scripts/verify-source-expansion-acceptance.ts",
     "deploy:preflight": "tsx scripts/verify-production-config.ts"
   },
   "dependencies": {

@@ -10,6 +10,7 @@ import { SchemaOrgConnector } from "../packages/connectors-schema-org/src/schema
 import type { SourceInstanceRef, SourceKind } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
 import { detectSource, type DetectedRecruitmentSource, type RecruitmentEntrypointAudit } from "../packages/discovery/src/recruitment-entry-auditor.js";
+import { parseEngageDiscoveryMode } from "../packages/discovery/src/engage-discovery-mode.js";
 import type { JetroOfpCompanyDetail } from "../packages/discovery/src/jetro-ofp.js";
 import { ExtractionService } from "../packages/extraction/src/extraction-service.js";
 import { SourceSyncService } from "../packages/ingestion/src/source-sync-service.js";
@@ -183,6 +184,14 @@ async function promoteSource(identity: { candidateId: string; companyId: string 
     await sql`UPDATE company_source_relationships SET verification_state='verified' WHERE id=${seeded.relationshipId}::uuid`.execute(trx);
     await sql`UPDATE source_discovery_candidates SET state='verified',verified_at=now(),linked_source_instance_id=${seeded.sourceInstanceId}::uuid
       WHERE source_kind=${kind}::source_kind AND tenant_key=${tenantKey} AND collection_url=${detected.url}`.execute(trx);
+    await sql`INSERT INTO source_schedules(source_instance_id,interval_hours,stale_refresh_allowed)
+      VALUES (${seeded.sourceInstanceId}::uuid,${jobs >= 100 ? 12 : 24},true)
+      ON CONFLICT(source_instance_id) DO UPDATE SET interval_hours=excluded.interval_hours,
+        stale_refresh_allowed=true,updated_at=now()`.execute(trx);
+    await sql`UPDATE canonical_jobs job SET lifecycle_state='active',updated_at=now()
+      FROM canonical_job_sources link JOIN source_job_records record ON record.id=link.source_job_record_id
+      WHERE link.canonical_job_id=job.id AND link.active_to IS NULL AND record.lifecycle_state='active'
+        AND record.source_instance_id=${seeded.sourceInstanceId}::uuid AND job.current_version_id IS NOT NULL`.execute(trx);
   });
   return { sourceInstanceId: seeded.sourceInstanceId, jobs, active };
 }
@@ -226,7 +235,8 @@ function aggregateSources(entry: EntrypointRow | undefined, candidates: Candidat
 }
 
 function supported(kind: string): kind is SupportedKind {
-  return ["hrmos", "herp", "jobcan", "airwork", "engage", "talentio", "schema_org"].includes(kind);
+  return ["hrmos", "herp", "jobcan", "airwork", "talentio", "schema_org"].includes(kind)
+    || (kind === "engage" && parseEngageDiscoveryMode(process.env.ENGAGE_DISCOVERY_MODE) === "active");
 }
 function hash(value: string): string { return createHash("sha256").update(value).digest("hex").slice(0, 16); }
 function isRecruitmentPlatform(host: string): boolean {
