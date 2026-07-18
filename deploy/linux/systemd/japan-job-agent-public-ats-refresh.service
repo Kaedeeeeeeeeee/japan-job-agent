@@ -5,7 +5,7 @@ After=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/japan-job-agent
+WorkingDirectory=/opt/japan-job-agent/tmp/current-release
 TimeoutStartSec=2h
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:public-ats
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:wantedly
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:public-ats
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:wantedly
