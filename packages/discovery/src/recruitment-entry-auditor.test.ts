@@ -24,6 +24,9 @@ describe("recruitment entrypoint audit", () => {
     });
     expect(detectSource("https://jobs.lever.co/acme/123")).toMatchObject({ kind: "lever", tenantKey: "acme" });
     expect(detectSource("https://jobs.ashbyhq.com/acme/123")).toMatchObject({ kind: "ashby", tenantKey: "acme" });
+    expect(detectSource("https://sonyglobal.wd1.myworkdayjobs.com/en-US/SonyJapanCareers/job/Tokyo/Role_JR-1"))
+      .toEqual({ kind: "workday", tenantKey: "sonyglobal.wd1.myworkdayjobs.com/SonyJapanCareers",
+        url: "https://sonyglobal.wd1.myworkdayjobs.com/en-US/SonyJapanCareers", collection: true });
     expect(detectSource("https://example.com/recruit")).toBeNull();
   });
 

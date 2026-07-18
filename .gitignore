@@ -18,4 +18,5 @@ tmp/
 
 # Generated local acceptance artifacts; keep job-level data out of Git.
 output/hybrid-parser-*.json
+output/freshness-parser-*.json
 output/playwright/occupation-filter-*.png

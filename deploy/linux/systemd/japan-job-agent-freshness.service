@@ -1,0 +1,11 @@
+[Unit]
+Description=Enforce Japan Job Agent six-month publication retention
+Requires=docker.service
+After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-public-ats-refresh.service japan-job-agent-promotion.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/japan-job-agent
+TimeoutStartSec=4h
+ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm db:migrate
+ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm freshness:apply

@@ -17,6 +17,7 @@ import {
   normalizeLocationText,
   normalizeSkillFacts,
 } from "./job-normalizers.js";
+import { parsePublishedDateValue } from "../../freshness/src/job-freshness.js";
 
 export interface Fact<T> {
   state: "known" | "unknown" | "conflicting";
@@ -78,7 +79,7 @@ export interface ParsedJob extends Record<string, unknown> {
 
 export class DeterministicJobParser implements JobParser {
   readonly parserKey = "deterministic-job";
-  readonly parserVersion = "1.8.3";
+  readonly parserVersion = "1.12.0";
   readonly schemaVersion = "job-v3";
 
   async parse(version: SourceJobVersion, context: ParserContext): Promise<ExtractionCandidate> {
@@ -258,9 +259,9 @@ function extractJobDates(
 ): ParsedJob["jobDates"] {
   const dateSections = document.sections.filter((section) => section.kind === "dates");
   return {
-    published: datesFor("jobDates.published", dateSections.filter((section) => /掲載|公開|投稿日|published|released|dateposted/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
+    published: datesFor("jobDates.published", dateSections.filter((section) => /掲載|公開|投稿日|募集開始|published|released|posted|dateposted|startdate/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
     sourceUpdated: datesFor("jobDates.sourceUpdated", dateSections.filter((section) => /更新|modified|updated/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
-    validThrough: datesFor("jobDates.validThrough", dateSections.filter((section) => /締切|期限|valid|expire/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
+    validThrough: datesFor("jobDates.validThrough", dateSections.filter((section) => /締切|期限|valid|expire|deadline/i.test(`${section.heading ?? ""} ${section.text}`)), sourceUrl, evidence),
   };
 }
 
@@ -268,7 +269,7 @@ function datesFor(fieldPath: string, sections: CanonicalDocumentSection[], sourc
   evidence: EvidenceCandidate[]): Fact<JobDateValue> {
   const values: JobDateValue[] = [];
   for (const section of sections) {
-    const rawValues = section.text.match(/\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T ][0-9:.+Z-]+)?/g) ?? [];
+    const rawValues = section.text.match(/\d{4}(?:\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日|[-/.]\d{1,2}[-/.]\d{1,2}(?:[T ][0-9:.+Z-]+)?)/g) ?? [];
     for (const raw of rawValues) {
       const parsed = parseJobDate(raw);
       if (parsed === null || values.some((value) => stableJson(value) === stableJson(parsed))) continue;
@@ -281,15 +282,7 @@ function datesFor(fieldPath: string, sections: CanonicalDocumentSection[], sourc
 }
 
 function parseJobDate(input: string): JobDateValue | null {
-  const normalizedDate = input.trim().replaceAll("/", "-");
-  const dateOnly = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(normalizedDate);
-  if (dateOnly?.[1] !== undefined && dateOnly[2] !== undefined && dateOnly[3] !== undefined) {
-    const value = `${dateOnly[1]}-${dateOnly[2].padStart(2, "0")}-${dateOnly[3].padStart(2, "0")}`;
-    const parsed = new Date(`${value}T00:00:00.000Z`);
-    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? { value, precision: "date" } : null;
-  }
-  const timestamp = Date.parse(input);
-  return Number.isFinite(timestamp) ? { value: new Date(timestamp).toISOString(), precision: "datetime" } : null;
+  return parsePublishedDateValue(input) ?? null;
 }
 
 function fact<T>(values: T[], reason: FactUnknownReason): Fact<T> {

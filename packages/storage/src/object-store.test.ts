@@ -9,4 +9,12 @@ describe("raw object storage", () => {
     expect(store.objects.get("raw/hash")).toEqual(new Uint8Array([1]));
     expect(await store.get("raw/hash")).toEqual(new Uint8Array([1]));
   });
+
+  it("deletes raw objects idempotently", async () => {
+    const store = new MemoryRawObjectStore();
+    await store.putIfAbsent("raw/hash", new Uint8Array([1]), "application/json");
+    await store.delete("raw/hash");
+    await store.delete("raw/hash");
+    await expect(store.get("raw/hash")).rejects.toThrow("does not exist");
+  });
 });

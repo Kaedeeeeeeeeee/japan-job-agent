@@ -8,6 +8,7 @@ import { HrmosConnector } from "../../connectors-hrmos/src/hrmos-connector.js";
 import { PublicCareerConnector, type PublicCareerKind } from "../../connectors-public-career/src/public-career-connector.js";
 import { AshbyConnector, LeverConnector, SmartRecruitersConnector } from "../../connectors-public-ats/src/public-ats-connectors.js";
 import { SchemaOrgConnector } from "../../connectors-schema-org/src/schema-org-connector.js";
+import { WorkdayConnector } from "../../connectors-workday/src/workday-connector.js";
 import type { SourceInstanceRef, SourceKind } from "../../contracts/src/index.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
 import { ExtractionService } from "../../extraction/src/extraction-service.js";
@@ -143,21 +144,26 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
   const row = sourceResult.rows[0];
   if (row === undefined) throw ApplicationFailure.nonRetryable("Verified source does not exist", "SOURCE_NOT_VERIFIED");
   if (row.source_kind === "manual") throw ApplicationFailure.nonRetryable("Manual sources are not scheduled", "MANUAL_SOURCE");
-  if (row.source_kind === "workday") throw ApplicationFailure.nonRetryable(
-    "Workday sources require per-tenant policy validation before scheduling",
-    "WORKDAY_POLICY_REVIEW_REQUIRED",
-  );
+  if (row.source_kind === "workday") {
+    const policy = await sql<{ allowed: boolean }>`SELECT allows_authoritative_snapshot AS allowed FROM source_policies
+      WHERE source_instance_id=${row.id}::uuid`.execute(db);
+    if (policy.rows[0]?.allowed !== true) throw ApplicationFailure.nonRetryable(
+      "Workday source lacks an approved authoritative snapshot policy",
+      "WORKDAY_POLICY_REVIEW_REQUIRED",
+    );
+  }
   const source: SourceInstanceRef = { id: row.id, sourceKind: row.source_kind, tenantKey: row.tenant_key, baseUrl: row.base_url };
   const store = createObjectStore();
   const idempotencyKey = `temporal:${workflowId}:${runId}`;
   let snapshotKind = "reused";
   if (["greenhouse", "hrmos", "herp", "jobcan", "airwork", "engage", "talentio",
-    "smartrecruiters", "lever", "ashby"].includes(row.source_kind)) {
+    "smartrecruiters", "lever", "ashby", "workday"].includes(row.source_kind)) {
     const connector = row.source_kind === "greenhouse" ? new GreenhouseConnector(sourceFetch)
       : row.source_kind === "hrmos" ? new HrmosConnector(sourceFetch)
       : row.source_kind === "smartrecruiters" ? new SmartRecruitersConnector(sourceFetch)
       : row.source_kind === "lever" ? new LeverConnector(sourceFetch)
       : row.source_kind === "ashby" ? new AshbyConnector(sourceFetch)
+      : row.source_kind === "workday" ? new WorkdayConnector(sourceFetch, 8 * 1024 * 1024, "Japan")
       : new PublicCareerConnector(row.source_kind as PublicCareerKind, sourceFetch);
     const result = await new SourceSyncService(db, connector, store).run({
       source, idempotencyKey, temporalWorkflowId: workflowId, temporalRunId: runId,

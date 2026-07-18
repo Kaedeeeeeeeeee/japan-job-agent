@@ -9,7 +9,7 @@ import type {
   SourceKind,
 } from "../../contracts/src/index.js";
 
-export const CANONICAL_DOCUMENT_ADAPTER_VERSION = "canonical-document-v2";
+export const CANONICAL_DOCUMENT_ADAPTER_VERSION = "canonical-document-v4";
 const MAX_SECTION_CHARS = 6_000;
 
 export interface CanonicalSourceAdapter {
@@ -159,12 +159,32 @@ function documentFromHtml(input: string, sourceKind: SourceKind, sourceUrl: stri
       { kind: "css", selector: cssLocator(visible, element), summaryIndex: index, sourceKind });
   });
 
-  const metaDates = ["datePublished", "article:published_time", "dateModified", "article:modified_time", "validThrough"]
+  const metaDates = [
+    "datePosted", "datePublished", "publishedAt", "article:published_time",
+    "dateModified", "article:modified_time", "validThrough",
+  ]
     .flatMap((name) => {
-      const value = $(`meta[name="${name}"],meta[property="${name}"]`).first().attr("content");
+      const value = $(`meta[name="${name}"],meta[property="${name}"],meta[itemprop="${name}"]`).first().attr("content");
       return value === undefined || value.trim() === "" ? [] : [`${name}: ${value.trim()}`];
     });
   if (metaDates.length > 0) append("dates", "metadata", metaDates.join("\n"), { kind: "meta", sourceKind });
+
+  const semanticDates: string[] = [];
+  $("[itemprop=datePosted],[itemprop=datePublished]").each((_index, element) => {
+    const node = $(element);
+    const value = node.attr("content") ?? node.attr("datetime") ?? cleanText(node.text());
+    if (value !== "") semanticDates.push(`${node.attr("itemprop")}: ${value}`);
+  });
+  $("time[datetime]").each((_index, element) => {
+    const node = $(element);
+    const context = cleanText(`${node.attr("aria-label") ?? ""} ${node.parent().text()}`);
+    const value = node.attr("datetime");
+    if (value !== undefined && /掲載|公開|投稿日|募集開始|posted|published/i.test(context)) {
+      semanticDates.push(`datePosted: ${value}`);
+    }
+  });
+  if (semanticDates.length > 0) append("dates", "semantic markup", [...new Set(semanticDates)].join("\n"),
+    { kind: "semantic_date", sourceKind });
 
   if (sections.length === 1 && fullVisibleText !== "") {
     append("other", null, fullVisibleText, { kind: "css", selector: root.is("main") ? "main" : "body", sourceKind });
@@ -196,7 +216,8 @@ function documentFromJson(input: unknown, sourceKind: SourceKind, sourceUrl: str
   append("title", "title", title, "$.title");
 
   const paths: Array<[CanonicalSectionKind, string, string[]]> = [
-    ["employment", "employment", ["employmentType", "typeOfEmployment", "commitment", "employment_type"]],
+    ["employment", "employment", ["employmentType", "typeOfEmployment", "commitment", "employment_type",
+      ...(sourceKind === "workday" ? ["timeType"] : [])]],
     ["location", "location", ["location", "locations", "jobLocation", "workplace", "workLocation"]],
     ["compensation", "compensation", ["baseSalary", "salary", "compensation", "salaryRange"]],
     ["responsibilities", "responsibilities", ["responsibilities", "description", "descriptionHtml", "descriptionPlain", "content"]],
@@ -205,7 +226,12 @@ function documentFromJson(input: unknown, sourceKind: SourceKind, sourceUrl: str
     ["skills", "skills", ["skills", "skill", "technologies"]],
     ["languages", "languages", ["languages", "languageRequirements"]],
     ["experience", "experience", ["experience", "experienceRequirements"]],
-    ["dates", "dates", ["datePosted", "publishedAt", "published_at", "releasedDate", "updatedAt", "updated_at", "validThrough", "expiresAt"]],
+    ["dates", "dates", [
+      "datePosted", "datePublished", "publishedAt", "published_at", "releasedDate", "postedAt", "posted_at",
+      "publishDate", "publishedDate", "first_published", "updatedAt", "updated_at", "validThrough", "expiresAt",
+      "application_deadline",
+      ...(sourceKind === "workday" ? ["startDate"] : []),
+    ]],
   ];
   for (const [kind, heading, keys] of paths) {
     for (const key of keys) {
@@ -243,7 +269,7 @@ export function classifySection(heading: string, text: string): CanonicalSection
   if (/歓迎|尚可|preferred|nice\s+to\s+have|歓迎要件/i.test(heading)) return "preferred_requirements";
   if (/必須|応募資格|応募条件|求める人材|必要条件|requirements?|qualifications?|must\s+have/i.test(heading)) return "required_requirements";
   if (/仕事内容|業務内容|職務内容|responsibilit|job\s+description|about\s+the\s+job/i.test(heading)) return "responsibilities";
-  if (/掲載日|更新日|公開日|締切|date\s*(posted|published|modified)|valid\s*through/i.test(label)) return "dates";
+  if (/掲載日|掲載開始日|募集開始日|投稿日|更新日|公開日|締切|date\s*(posted|published|modified)|published\s*at|posted\s*at|valid\s*through/i.test(label)) return "dates";
   return "other";
 }
 
@@ -300,7 +326,7 @@ function unwrapJobObject(input: unknown): Record<string, unknown> {
     return first ?? {};
   }
   if (!isObject(input)) return {};
-  for (const key of ["job", "jobPosting", "posting", "data"]) {
+  for (const key of ["job", "jobPosting", "posting", "data", "jobPostingInfo"]) {
     const nested = input[key];
     if (isObject(nested) && firstText(nested, ["title", "name", "text", "jobTitle"]) !== "") return nested;
   }

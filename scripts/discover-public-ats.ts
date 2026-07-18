@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
 import { AshbyConnector, LeverConnector, SmartRecruitersConnector } from "../packages/connectors-public-ats/src/public-ats-connectors.js";
+import { WorkdayConnector, workdayTenantKey } from "../packages/connectors-workday/src/workday-connector.js";
 import type { SourceConnector, SourceInstanceRef } from "../packages/contracts/src/index.js";
 import { ConnectorError } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
@@ -14,11 +15,16 @@ import {
   type PublicAtsTenantSeed,
 } from "../packages/discovery/src/public-ats-discovery.js";
 import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
+import {
+  discoveryBackfillWindow,
+  evaluateLeadForBackfill,
+} from "../packages/freshness/src/discovery-backfill-window.js";
 
 const databaseUrl = required("DATABASE_URL");
 const githubToken = process.env.GITHUB_TOKEN;
-const maximumTenants = positiveInteger(process.env.PUBLIC_ATS_MAX_TENANTS, 1_000);
+const maximumTenants = positiveInteger(process.env.PUBLIC_ATS_MAX_TENANTS, 2_500);
 const hostIntervalMs = positiveInteger(process.env.PUBLIC_ATS_HOST_INTERVAL_MS, 1_000);
+const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 const discovery = new JobDiscoveryService(db);
@@ -26,12 +32,15 @@ const atsFetch = rateLimitedFetch(hostIntervalMs);
 
 try {
   const configured = await readSeeds(process.env.PUBLIC_ATS_TENANT_FILE ?? "config/public-ats-tenant-seeds.json");
+  const registered = await registeredTenantSeeds();
   const existing = await existingCandidateSeeds();
   const discovered = githubToken === undefined ? [] : await discoverGithubTenants(githubToken);
-  const seeds = limitTenantSeeds(deduplicateSeeds([...configured, ...existing, ...discovered]), maximumTenants);
+  const availableSeeds = deduplicateSeeds([...configured, ...registered, ...existing, ...discovered]);
+  await registerTenantSeeds(availableSeeds);
+  const seeds = limitTenantSeeds(availableSeeds, maximumTenants);
   const sources = await ensureDiscoverySources();
   const grouped = Map.groupBy(seeds, (seed) => seed.kind);
-  const results = await Promise.all((["smartrecruiters", "lever", "ashby"] as const).map(async (kind) => {
+  const results = await Promise.all((["smartrecruiters", "lever", "ashby", "workday"] as const).map(async (kind) => {
     if (!await sourceEnabled(sources[kind])) return [];
     const connector = connectorFor(kind, atsFetch);
     const rows = [];
@@ -62,7 +71,17 @@ try {
           })
           : undefined;
         let inserted = 0;
+        let eligibleLeads = 0;
+        let excludedUnknownPublication = 0;
+        let excludedOutsideWindow = 0;
         for (const lead of result.leads) {
+          const windowDecision = evaluateLeadForBackfill(lead, backfillWindow);
+          if (windowDecision !== null && !windowDecision.eligible) {
+            if (windowDecision.reason === "publication_date_unknown") excludedUnknownPublication += 1;
+            else excludedOutsideWindow += 1;
+            continue;
+          }
+          eligibleLeads += 1;
           const persisted = await discovery.ingest({ ...lead, ...(importRunId === undefined ? {} : {
             discoveryImportRunId: importRunId,
             observationKey: `${lead.observationKey}:snapshot:${importRunId}`,
@@ -70,7 +89,8 @@ try {
           if (persisted.candidateCreated) inserted += 1;
         }
         rows.push({ kind, tenantKey: seed.tenantKey, snapshotKind: result.snapshot.kind,
-          currentJobs: result.snapshot.jobs.length, japanLeads: result.leads.length, inserted,
+          currentJobs: result.snapshot.jobs.length, japanLeads: result.leads.length, eligibleLeads, inserted,
+          excludedUnknownPublication, excludedOutsideWindow,
           excludedNonJapan: result.excludedNonJapan, excludedUnknownLocation: result.excludedUnknownLocation });
       } catch (error) {
         rows.push({ kind, tenantKey: seed.tenantKey, snapshotKind: "failed", currentJobs: 0, japanLeads: 0,
@@ -86,7 +106,11 @@ try {
     return rows;
   }));
   const summary = await discovery.summary();
-  const report = { generatedAt: new Date().toISOString(), seedCount: seeds.length, sources: results.flat(), summary };
+  const report = { generatedAt: new Date().toISOString(), seedCount: seeds.length,
+    publicationWindow: backfillWindow === null ? null : {
+      days: backfillWindow.days, cutoffDate: backfillWindow.cutoffDate, today: backfillWindow.today,
+    },
+    sources: results.flat(), summary };
   await fs.mkdir(path.resolve("tmp"), { recursive: true });
   await replaceWithAtomicFile(path.resolve("tmp/public-ats-discovery-report.json"), (temporaryPath) =>
     fs.writeFile(temporaryPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }));
@@ -100,6 +124,7 @@ async function ensureDiscoverySources(): Promise<Record<PublicAtsTenantSeed["kin
     ["smartrecruiters", "SmartRecruiters public Posting API", "https://api.smartrecruiters.com/v1/companies/"],
     ["lever", "Lever public Postings API", "https://api.lever.co/v0/postings/"],
     ["ashby", "Ashby public Job Postings API", "https://api.ashbyhq.com/posting-api/job-board/"],
+    ["workday", "Workday public CXS careers API", "https://www.myworkdayjobs.com/"],
   ];
   const output = {} as Record<PublicAtsTenantSeed["kind"], string>;
   for (const [kind, name, baseUrl] of values) {
@@ -124,6 +149,7 @@ async function discoverGithubTenants(token: string): Promise<PublicAtsTenantSeed
     ["smartrecruiters", "jobs.smartrecruiters.com/"],
     ["lever", "jobs.lever.co/"],
     ["ashby", "jobs.ashbyhq.com/"],
+    ["workday", "myworkdayjobs.com/"],
   ];
   const output: PublicAtsTenantSeed[] = [];
   for (const [kind, host] of hosts) {
@@ -161,6 +187,15 @@ async function discoverGithubTenants(token: string): Promise<PublicAtsTenantSeed
 }
 
 export function tenantsFromText(kind: PublicAtsTenantSeed["kind"], text: string): string[] {
+  if (kind === "workday") {
+    const pattern = /https?:\/\/([A-Za-z0-9-]+\.wd[0-9a-z-]*\.myworkdayjobs\.com)\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?([A-Za-z0-9._-]+)/g;
+    return [...text.matchAll(pattern)].flatMap((match) => {
+      const host = match[1];
+      const site = match[2];
+      return host === undefined || site === undefined || ["wday", "job"].includes(site.toLowerCase())
+        ? [] : [`${host.toLowerCase()}/${site}`];
+    });
+  }
   const host = kind === "smartrecruiters" ? "jobs\\.smartrecruiters\\.com"
     : kind === "lever" ? "jobs\\.lever\\.co" : "jobs\\.ashbyhq\\.com";
   const pattern = new RegExp(`https?://${host}/([A-Za-z0-9._-]+)`, "g");
@@ -171,7 +206,8 @@ export function tenantsFromText(kind: PublicAtsTenantSeed["kind"], text: string)
 function deduplicateSeeds(values: PublicAtsTenantSeed[]): PublicAtsTenantSeed[] {
   const output = new Map<string, PublicAtsTenantSeed>();
   for (const value of values) {
-    if (!/^[A-Za-z0-9._-]+$/.test(value.tenantKey)) continue;
+    if (value.kind === "workday" ? !/^[A-Za-z0-9-]+\.wd[0-9a-z-]*\.myworkdayjobs\.com\/[A-Za-z0-9._-]+$/i.test(value.tenantKey)
+      : !/^[A-Za-z0-9._-]+$/.test(value.tenantKey)) continue;
     const key = `${value.kind}:${value.tenantKey.toLowerCase()}`;
     const current = output.get(key);
     if (current === undefined) {
@@ -188,7 +224,7 @@ function deduplicateSeeds(values: PublicAtsTenantSeed[]): PublicAtsTenantSeed[] 
 }
 
 export function limitTenantSeeds(values: PublicAtsTenantSeed[], maximum: number): PublicAtsTenantSeed[] {
-  const kinds = ["smartrecruiters", "lever", "ashby"] as const;
+  const kinds = ["smartrecruiters", "lever", "ashby", "workday"] as const;
   const perFamily = Math.ceil(maximum / kinds.length);
   return kinds.flatMap((kind) => values.filter((value) => value.kind === kind).slice(0, perFamily)).slice(0, maximum);
 }
@@ -206,14 +242,52 @@ async function existingCandidateSeeds(): Promise<PublicAtsTenantSeed[]> {
   const result = await sql<{ kind: PublicAtsTenantSeed["kind"]; tenant_key: string; company_name: string }>`SELECT
       source_family kind,tenant_key,max(company_name) company_name
     FROM job_discovery_candidates
-    WHERE source_family IN ('smartrecruiters','lever','ashby') AND tenant_key IS NOT NULL
+    WHERE source_family IN ('smartrecruiters','lever','ashby','workday') AND tenant_key IS NOT NULL
     GROUP BY source_family,tenant_key`.execute(db);
   return result.rows.map((row) => ({ kind: row.kind, tenantKey: row.tenant_key, companyName: row.company_name }));
 }
 
+async function registeredTenantSeeds(): Promise<PublicAtsTenantSeed[]> {
+  const result = await sql<{ base_url: string }>`SELECT base_url FROM discovery_sources
+    WHERE source_key LIKE 'public-ats-tenant-%' AND enabled=true ORDER BY source_key`.execute(db);
+  return result.rows.flatMap((row) => {
+    const parsed = tenantSeedFromBaseUrl(row.base_url);
+    return parsed === null ? [] : [parsed];
+  });
+}
+
+async function registerTenantSeeds(seeds: PublicAtsTenantSeed[]): Promise<void> {
+  for (const seed of seeds) {
+    const baseUrl = publicAtsBaseUrl(seed.kind, seed.tenantKey);
+    await sql`INSERT INTO discovery_sources(source_key,name,source_kind,base_url,policy_notes)
+      VALUES (${`public-ats-tenant-${seed.kind}-${seed.tenantKey.toLowerCase().replaceAll("/", "-")}`},
+        ${`Public ATS tenant ${seed.kind}:${seed.tenantKey}`},'public_ats',${baseUrl},
+        'Public tenant discovered from configured seeds, existing candidates, or public GitHub code. '
+          || 'Jobs remain Discovery-only until an official company backlink verifies the exact tenant.')
+      ON CONFLICT(source_key) DO UPDATE SET name=excluded.name,base_url=excluded.base_url,updated_at=now()`
+      .execute(db);
+  }
+}
+
+function tenantSeedFromBaseUrl(rawUrl: string): PublicAtsTenantSeed | null {
+  let url: URL;
+  try { url = new URL(rawUrl); } catch { return null; }
+  if (/^[a-z0-9-]+\.wd[0-9a-z-]*\.myworkdayjobs\.com$/i.test(url.hostname)) {
+    try { return { kind: "workday", tenantKey: workdayTenantKey(rawUrl) }; } catch { return null; }
+  }
+  const tenantKey = url.pathname.split("/").filter(Boolean)[0];
+  if (tenantKey === undefined || !/^[A-Za-z0-9._-]+$/.test(tenantKey)) return null;
+  if (url.hostname === "jobs.smartrecruiters.com") return { kind: "smartrecruiters", tenantKey };
+  if (url.hostname === "jobs.lever.co") return { kind: "lever", tenantKey };
+  if (url.hostname === "jobs.ashbyhq.com") return { kind: "ashby", tenantKey };
+  return null;
+}
+
 function connectorFor(kind: PublicAtsTenantSeed["kind"], fetchImplementation: typeof fetch): SourceConnector {
   return kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
-    : kind === "lever" ? new LeverConnector(fetchImplementation) : new AshbyConnector(fetchImplementation);
+    : kind === "lever" ? new LeverConnector(fetchImplementation)
+      : kind === "ashby" ? new AshbyConnector(fetchImplementation)
+        : new WorkdayConnector(fetchImplementation, 8 * 1024 * 1024, "Japan");
 }
 
 async function withRetry<T>(operation: () => Promise<T>, attempt = 0): Promise<T> {

@@ -132,8 +132,14 @@ export function detectSource(value: string): DetectedRecruitmentSource | null {
   if (host === "jobs.ashbyhq.com" && (match = url.pathname.match(/^\/([^/]+)/)) !== null) {
     return { kind: "ashby", tenantKey: match[1] ?? "", url: `https://jobs.ashbyhq.com/${match[1]}`, collection: true };
   }
-  if (host.endsWith("myworkdayjobs.com")) {
-    return { kind: "workday", tenantKey: host, url: url.origin + url.pathname, collection: true };
+  if (/^[a-z0-9-]+\.wd[0-9a-z-]*\.myworkdayjobs\.com$/.test(host)) {
+    const segments = url.pathname.split("/").filter(Boolean);
+    const jobIndex = segments.indexOf("job");
+    const site = jobIndex > 0 ? segments[jobIndex - 1]
+      : segments.find((segment) => !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(segment));
+    if (site === undefined || site === "" || site === "wday") return null;
+    return { kind: "workday", tenantKey: `${host}/${site}`,
+      url: `https://${host}/en-US/${site}`, collection: true };
   }
   if (host === "recruit.jobcan.jp" && (match = url.pathname.match(/^\/([^/]+)(?:\/job_offers\/([^/]+))?/)) !== null) {
     return { kind: "jobcan", tenantKey: match[1] ?? "", url: `https://recruit.jobcan.jp/${match[1]}`, collection: true };
@@ -180,6 +186,7 @@ function extractEmbeddedSourceUrls(html: string): string[] {
     /https?:\/\/(?:jobs|careers)\.smartrecruiters\.com\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
     /https?:\/\/jobs\.lever\.co\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
     /https?:\/\/jobs\.ashbyhq\.com\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]*)?/gi,
+    /https?:\/\/[A-Za-z0-9-]+\.wd[0-9a-z-]*\.myworkdayjobs\.com\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]+/gi,
   ];
   return [...new Set(patterns.flatMap((pattern) => [...html.matchAll(pattern)].map((match) => match[0])))]
     .slice(0, 100);

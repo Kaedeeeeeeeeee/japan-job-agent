@@ -22,3 +22,4 @@
 | [018](./018-temporal-outbox-idempotency.md) | Temporal and Outbox are idempotent | Accepted |
 | [019](./019-llm-evidence-and-embedding-recall.md) | LLM proposes evidence; embeddings recall only | Accepted |
 | [020](./020-job-discovery-isolation-and-promotion.md) | Discovery is isolated until verified promotion | Accepted |
+| [021](./021-publication-freshness-retention.md) | Publication freshness controls admission and retention | Accepted |

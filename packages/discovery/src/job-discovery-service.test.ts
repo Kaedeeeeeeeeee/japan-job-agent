@@ -71,7 +71,7 @@ integration("job discovery persistence and promotion leases", () => {
       count(DISTINCT c.id)::int candidates,count(o.id)::int observations,
       (SELECT count(*)::int FROM source_job_records r WHERE r.canonical_url=${lead.detailUrl}) source_records
       FROM job_discovery_candidates c LEFT JOIN job_discovery_observations o ON o.candidate_id=c.id
-      WHERE c.external_key=${lead.externalKey}`.execute(db);
+      WHERE c.discovery_source_id=${discoverySourceId}::uuid AND c.external_key=${lead.externalKey}`.execute(db);
     expect(counts.rows[0]).toEqual({ candidates: 1, observations: 1, source_records: 0 });
   });
 
@@ -92,6 +92,34 @@ integration("job discovery persistence and promotion leases", () => {
     await expect(service.ingest(missingRun)).rejects.toThrow("require a finalized import run");
   });
 
+  it("upgrades an existing unbound official candidate to a finalized authoritative source", async () => {
+    const unboundSourceId = randomUUID();
+    const authoritativeSourceId = randomUUID();
+    await sql`INSERT INTO discovery_sources(id,source_key,name,source_kind,base_url) VALUES
+      (${unboundSourceId}::uuid,${`fixture-unbound-${unboundSourceId}`},'Unbound sitemap','public_ats','https://example.com/sitemap'),
+      (${authoritativeSourceId}::uuid,${`fixture-authoritative-${authoritativeSourceId}`},'Formal source','official_career_site','https://example.com/formal')`
+      .execute(db);
+    const first = fixtureLead(unboundSourceId, "source-upgrade", "official_collection", false, "Tokyo");
+    const created = await service.ingest(first);
+    const runId = await service.recordFinalizedAuthoritativeImport({
+      discoverySourceId: authoritativeSourceId,
+      idempotencyKey: "fixture-source-upgrade",
+      pageCount: 1,
+      providerTotal: 1,
+      discoveredCount: 1,
+      rawHash: createHash("sha256").update("fixture-source-upgrade").digest("hex"),
+      validation: { allPagesCompleted: true, tenantIdentityConsistent: true, providerTotalMatched: true, parseErrors: [] },
+    });
+    const upgraded = await service.ingest({ ...first, discoverySourceId: authoritativeSourceId,
+      authoritative: true, discoveryImportRunId: runId, observationKey: `${first.observationKey}:formal` });
+    expect(upgraded.candidateId).toBe(created.candidateId);
+    const row = await sql<{ discovery_source_id: string; last_authoritative_import_run_id: string;
+      observation_count: number }>`SELECT discovery_source_id,last_authoritative_import_run_id,observation_count
+      FROM job_discovery_candidates WHERE id=${created.candidateId}::uuid`.execute(db);
+    expect(row.rows[0]).toEqual({ discovery_source_id: authoritativeSourceId,
+      last_authoritative_import_run_id: runId, observation_count: 2 });
+  });
+
   it("requires two recent observations for non-official leads", async () => {
     const first = fixtureLead(discoverySourceId, "aggregator", "aggregator_lead", false, "東京都");
     const created = await service.ingest(first);
@@ -105,6 +133,28 @@ integration("job discovery persistence and promotion leases", () => {
       FROM job_discovery_candidates WHERE id=${observedAgain.candidateId}::uuid`.execute(db);
     expect(freshness.rows[0]?.observation_count).toBe(2);
     expect(freshness.rows[0]?.last_seen_at.toISOString()).toBe("2026-07-14T01:00:00.000Z");
+  });
+
+  it("quarantines unknown publication dates and tombstones known-old postings without storing their content", async () => {
+    const unknown = fixtureLead(discoverySourceId, "unknown-publication", "aggregator_lead", false, "Tokyo");
+    delete unknown.published;
+    const quarantined = await service.ingest(unknown);
+    expect(quarantined).toMatchObject({ countable: false, disposition: "quarantined" });
+
+    const old = {
+      ...fixtureLead(discoverySourceId, "known-old", "aggregator_lead", false, "Tokyo"),
+      published: { value: "2025-01-01", precision: "date" as const },
+    };
+    const first = await service.ingest(old);
+    const replay = await service.ingest({ ...old, observationKey: `${old.observationKey}:replay` });
+    expect(first).toMatchObject({ countable: false, disposition: "tombstoned", observationCreated: false });
+    expect(replay.candidateId).toBe(first.candidateId);
+    const persisted = await sql<{ candidates: number; tombstones: number; observations: number }>`SELECT
+      (SELECT count(*)::int FROM job_discovery_candidates WHERE external_key=${old.externalKey}) candidates,
+      (SELECT count(*)::int FROM job_retention_tombstones WHERE source_family=${old.sourceFamily}
+        AND tenant_key=${old.tenantKey ?? null} AND external_posting_id=${old.externalPostingId ?? null}) tombstones,
+      (SELECT count(*)::int FROM job_discovery_observations WHERE raw_title=${old.title}) observations`.execute(db);
+    expect(persisted.rows[0]).toEqual({ candidates: 0, tombstones: 1, observations: 0 });
   });
 
   it("uses SKIP LOCKED so two workers claim one promotion once", async () => {
@@ -125,14 +175,17 @@ integration("job discovery persistence and promotion leases", () => {
     const ingested = await service.ingest(lead);
     await service.applyResolution(ingested.candidateId, { status: "resolved", officialUrl: lead.detailUrl,
       sourceInstanceId: sourceId, evidenceIds: [evidenceId] });
-    const attemptId = await service.enqueuePromotion(ingested.candidateId, "fixture-promotion");
+    // Make this fixture the first eligible row even when the integration database contains older test artifacts.
+    const attemptId = await service.enqueuePromotion(ingested.candidateId, "fixture-promotion", new Date(0));
     expect(await service.enqueuePromotion(ingested.candidateId, "fixture-promotion")).toBe(attemptId);
     const [first, second] = await Promise.all([
       service.claimPromotionAttempts("worker-a", 1),
       service.claimPromotionAttempts("worker-b", 1),
     ]);
-    expect(first.length + second.length).toBe(1);
-    const claimed = first[0] ?? second[0];
+    // A second worker may legitimately claim another global queue entry, so only count this fixture's lease.
+    const targetClaims = [...first, ...second].filter((attempt) => attempt.id === attemptId);
+    expect(targetClaims).toHaveLength(1);
+    const claimed = targetClaims[0];
     expect(claimed?.id).toBe(attemptId);
     expect(claimed?.attemptCount).toBe(1);
     await sql`UPDATE job_promotion_attempts SET leased_at=now()-interval '10 minutes',
@@ -192,14 +245,14 @@ function fixtureLead(
   authoritative: boolean,
   locationText: string,
 ): JobDiscoveryLead {
-  const detailUrl = `https://example.com/jobs/${key}`;
+  const detailUrl = `https://example.com/jobs/${discoverySourceId}/${key}`;
   const payload = JSON.stringify({ key, locationText });
   return {
     discoverySourceId,
     originKind,
     sourceFamily: originKind === "aggregator_lead" ? "fixture-aggregator" : "fixture-ats",
     sourceKindHint: "manual",
-    tenantKey: "fixture",
+    tenantKey: `fixture-${discoverySourceId}`,
     externalPostingId: key,
     externalKey: key,
     detailUrl,
@@ -207,6 +260,7 @@ function fixtureLead(
     title: `Engineer ${key}`,
     locationText,
     priority: "p0",
+    published: { value: "2026-07-14", precision: "date" },
     observationKey: `fixture:${key}:2026-07-14`,
     payloadHash: createHash("sha256").update(payload).digest("hex"),
     observedAt: "2026-07-14T00:00:00.000Z",

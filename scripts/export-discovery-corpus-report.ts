@@ -11,6 +11,7 @@ interface CandidateRow {
   location_text: string;
   priority: string;
   source_published_precision: string | null;
+  publication_freshness: "recent" | "unknown_quarantine" | "expired";
   resolved_source_instance_id: string | null;
 }
 
@@ -21,9 +22,9 @@ const client = new Client({ connectionString: databaseUrl });
 await client.connect();
 try {
   const candidates = await client.query<CandidateRow>(`SELECT id,state,source_family,company_name,title,location_text,
-      priority,source_published_precision,resolved_source_instance_id
+      priority,source_published_precision,publication_freshness,resolved_source_instance_id
     FROM job_discovery_candidates
-    WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND (
+    WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND publication_freshness='recent' AND (
       (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
         AND last_authoritative_seen_at>=now()-interval '72 hours')
       OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=now()-interval '30 days'))`);
@@ -65,6 +66,8 @@ try {
     topCompanies: companies,
     dates: { publishedKnown, publishedUnknown: candidates.rows.length - publishedKnown,
       unknownRate: fraction(candidates.rows.length - publishedKnown, candidates.rows.length) },
+    freshness: { policyVersion: "published-six-calendar-months-v1", retentionMonths: 6,
+      recent: candidates.rows.filter((row) => row.publication_freshness === "recent").length },
     officialExit: { resolved: officialExitResolved, unresolved: candidates.rows.length - officialExitResolved,
       resolutionRate: fraction(officialExitResolved, candidates.rows.length) },
     duplicates: duplicates.rows[0] ?? { external_keys: 0, detail_urls: 0, official_urls: 0 },

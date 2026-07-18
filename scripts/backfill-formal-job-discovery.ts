@@ -4,6 +4,10 @@ import pg from "pg";
 import type { JobDiscoveryLead, SourceKind } from "../packages/contracts/src/index.js";
 import type { OutboxDatabase } from "../packages/db/src/outbox.js";
 import { JobDiscoveryService } from "../packages/discovery/src/job-discovery-service.js";
+import {
+  discoveryBackfillWindow,
+  evaluateLeadForBackfill,
+} from "../packages/freshness/src/discovery-backfill-window.js";
 
 interface FormalJobRow {
   source_job_record_id: string;
@@ -25,6 +29,7 @@ interface FormalJobRow {
 }
 
 const databaseUrl = required("DATABASE_URL");
+const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 const discovery = new JobDiscoveryService(db);
@@ -66,6 +71,8 @@ try {
   let admitted = 0;
   let promoted = 0;
   let skippedUnknownLocation = 0;
+  let skippedUnknownPublication = 0;
+  let skippedOutsideWindow = 0;
   for (const job of jobs) {
     const locationText = locationFromStructured(job.structured_result);
     if (locationText === "") {
@@ -74,6 +81,16 @@ try {
     }
     const observedAt = job.last_seen_at.toISOString();
     const payload = JSON.stringify(job.structured_result);
+    const published = publishedFromStructured(job.structured_result);
+    const windowDecision = evaluateLeadForBackfill(
+      published === undefined ? {} : { published },
+      backfillWindow,
+    );
+    if (windowDecision !== null && !windowDecision.eligible) {
+      if (windowDecision.reason === "publication_date_unknown") skippedUnknownPublication += 1;
+      else skippedOutsideWindow += 1;
+      continue;
+    }
     const lead: JobDiscoveryLead = {
       discoverySourceId,
       originKind: "official_collection",
@@ -88,6 +105,7 @@ try {
       title: job.title,
       locationText,
       priority: priorityForJob(`${job.title}\n${payload}`),
+      ...(published === undefined ? {} : { published, rawPublishedText: published.value }),
       observationKey: `formal-backfill:${job.source_job_record_id}:${importRuns.get(job.source_instance_id)!}`,
       payloadHash: createHash("sha256").update(payload).digest("hex"),
       observedAt,
@@ -97,6 +115,7 @@ try {
     };
     const result = await discovery.ingest(lead);
     if (result.countable) admitted += 1;
+    if (result.disposition !== "admitted") continue;
     await db.transaction().execute(async (trx) => {
       await sql`INSERT INTO job_discovery_resolution_evidence(candidate_id,evidence_id)
         VALUES (${result.candidateId}::uuid,${job.evidence_id}::uuid) ON CONFLICT DO NOTHING`.execute(trx);
@@ -113,6 +132,7 @@ try {
     promoted += 1;
   }
   process.stdout.write(`${JSON.stringify({ formalJobs: jobs.length, admitted, promoted, skippedUnknownLocation,
+    skippedUnknownPublication, skippedOutsideWindow,
     summary: await discovery.summary() })}\n`);
 } finally {
   await db.destroy();
@@ -132,6 +152,15 @@ function locationFromStructured(value: Record<string, unknown>): string {
   const locations = isObject(value.locations) && Array.isArray(value.locations.values) ? value.locations.values : [];
   return locations.flatMap((location) => isObject(location) && typeof location.addressText === "string"
     ? [location.addressText] : []).filter(Boolean).join(" / ");
+}
+
+function publishedFromStructured(value: Record<string, unknown>): JobDiscoveryLead["published"] {
+  if (!isObject(value.jobDates) || !isObject(value.jobDates.published)
+    || value.jobDates.published.state !== "known" || !Array.isArray(value.jobDates.published.values)) return undefined;
+  const candidate = value.jobDates.published.values[0];
+  if (!isObject(candidate) || typeof candidate.value !== "string"
+    || (candidate.precision !== "date" && candidate.precision !== "datetime")) return undefined;
+  return { value: candidate.value, precision: candidate.precision };
 }
 
 function priorityForJob(input: string): JobDiscoveryLead["priority"] {

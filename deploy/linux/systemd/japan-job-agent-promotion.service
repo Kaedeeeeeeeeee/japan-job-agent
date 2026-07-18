@@ -1,7 +1,7 @@
 [Unit]
 Description=Resolve and promote verified Discovery candidates
 Requires=docker.service
-After=docker.service japan-job-agent-discovery-refresh.service
+After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-public-ats-refresh.service
 
 [Service]
 Type=oneshot

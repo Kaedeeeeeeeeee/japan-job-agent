@@ -1,10 +1,11 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 export interface RawObjectStore {
   putIfAbsent(key: string, bytes: Uint8Array, contentType: string | null): Promise<void>;
   get(key: string): Promise<Uint8Array>;
+  delete(key: string): Promise<void>;
 }
 
 export class S3RawObjectStore implements RawObjectStore {
@@ -36,6 +37,10 @@ export class S3RawObjectStore implements RawObjectStore {
     if (response.Body === undefined) throw new Error(`S3 object ${key} has no body`);
     return Uint8Array.from(await response.Body.transformToByteArray());
   }
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
 }
 
 export class MemoryRawObjectStore implements RawObjectStore {
@@ -50,6 +55,10 @@ export class MemoryRawObjectStore implements RawObjectStore {
     const value = this.objects.get(key);
     if (value === undefined) throw new Error(`Object ${key} does not exist`);
     return value.slice();
+  }
+
+  async delete(key: string): Promise<void> {
+    this.objects.delete(key);
   }
 }
 
@@ -72,6 +81,15 @@ export class FileRawObjectStore implements RawObjectStore {
   async get(key: string): Promise<Uint8Array> {
     const target = this.resolveKey(key);
     return Uint8Array.from(await fs.readFile(target));
+  }
+
+  async delete(key: string): Promise<void> {
+    const target = this.resolveKey(key);
+    try {
+      await fs.unlink(target);
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    }
   }
 
   private resolveKey(key: string): string {

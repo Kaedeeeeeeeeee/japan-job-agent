@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { AshbyConnector } from "../../connectors-public-ats/src/public-ats-connectors.js";
+import { WorkdayConnector } from "../../connectors-workday/src/workday-connector.js";
 import { collectPublicAtsDiscovery } from "./public-ats-discovery.js";
 
 describe("public ATS discovery", () => {
@@ -26,5 +27,28 @@ describe("public ATS discovery", () => {
     });
     expect(result.excludedNonJapan).toBe(1);
     expect(result.excludedUnknownLocation).toBe(1);
+  });
+
+  it("uses exact Workday detail dates after filtering Japan list locations", async () => {
+    const connector = new WorkdayConnector(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/jobs")) return new Response(JSON.stringify({ total: 2, jobPostings: [
+        { title: "AI Engineer", externalPath: "/job/Tokyo/AI-Engineer_JR-1", locationsText: "Tokyo, Japan" },
+        { title: "Engineer", externalPath: "/job/London/Engineer_JR-2", locationsText: "London, UK" },
+      ] }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ hiringOrganization: { name: "Sony" }, jobPostingInfo: {
+        title: "AI Engineer", jobReqId: "JR-1", location: "Tokyo, Japan", startDate: "2026-07-16",
+        jobDescription: "Build machine learning products in Tokyo.",
+      } }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const tenantKey = "sonyglobal.wd1.myworkdayjobs.com/SonyJapanCareers";
+    const source = { id: randomUUID(), sourceKind: "workday" as const, tenantKey,
+      baseUrl: "https://sonyglobal.wd1.myworkdayjobs.com/en-US/SonyJapanCareers" };
+    const result = await collectPublicAtsDiscovery(connector, source, { kind: "workday", tenantKey },
+      randomUUID(), AbortSignal.timeout(1_000));
+    expect(result.leads).toHaveLength(1);
+    expect(result.leads[0]).toMatchObject({ companyName: "Sony", title: "AI Engineer",
+      published: { value: "2026-07-16", precision: "date" } });
+    expect(result.excludedNonJapan).toBe(1);
   });
 });
