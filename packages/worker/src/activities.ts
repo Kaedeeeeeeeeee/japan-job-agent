@@ -181,10 +181,16 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
     snapshotKind = result.snapshot?.kind ?? "reused";
   }
   const parser = new DeterministicJobParser();
-  const versions = await sql<{ id: string }>`SELECT v.id FROM source_job_versions v JOIN source_job_records r ON r.id=v.source_job_record_id
-    WHERE r.source_instance_id=${row.id}::uuid AND NOT EXISTS(SELECT 1 FROM source_job_extractions e
-      WHERE e.source_job_version_id=v.id AND e.parser_key=${parser.parserKey} AND e.parser_version=${parser.parserVersion}
-      AND e.schema_version=${parser.schemaVersion}) ORDER BY v.fetched_at`.execute(db);
+  const versions = await sql<{ id: string }>`SELECT latest.id FROM source_job_records r
+    JOIN LATERAL (
+      SELECT v.id FROM source_job_versions v WHERE v.source_job_record_id=r.id
+      ORDER BY v.fetched_at DESC,v.id DESC LIMIT 1
+    ) latest ON true
+    WHERE r.source_instance_id=${row.id}::uuid AND r.lifecycle_state='active'
+      AND NOT EXISTS(SELECT 1 FROM source_job_extractions e
+        WHERE e.source_job_version_id=latest.id AND e.parser_key=${parser.parserKey}
+        AND e.parser_version=${parser.parserVersion} AND e.schema_version=${parser.schemaVersion})
+    ORDER BY latest.id`.execute(db);
   const extractionService = new ExtractionService(db, store);
   const provider = createAiProviderFromEnv();
   const enrichmentEnabled = process.env.AI_ENRICHMENT_ENABLED === "true";
@@ -194,7 +200,20 @@ async function runPipeline(db: Kysely<OutboxDatabase>, input: SourceSyncWorkflow
   let succeeded = 0;
   let materialized = 0;
   for (const version of versions.rows) {
-    const extraction = await extractionService.extract(version.id, parser);
+    let extraction: Awaited<ReturnType<ExtractionService["extract"]>>;
+    try {
+      extraction = await extractionService.extract(version.id, parser);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      await sql`INSERT INTO manual_review_tasks(source_instance_id,reason,detail)
+        SELECT ${row.id}::uuid,'raw_object_missing_or_unreadable',
+          ${JSON.stringify({ sourceJobVersionId: version.id, error: detail })}::jsonb
+        WHERE NOT EXISTS(SELECT 1 FROM manual_review_tasks
+          WHERE source_instance_id=${row.id}::uuid AND reason='raw_object_missing_or_unreadable'
+          AND state='open' AND detail->>'sourceJobVersionId'=${version.id})`.execute(db);
+      process.stderr.write(`extraction skipped for ${version.id}: ${detail}\n`);
+      continue;
+    }
     if (extraction.status !== "succeeded") continue;
     succeeded += 1;
     const canonical = await canonicalService.materialize(extraction.extractionId);
