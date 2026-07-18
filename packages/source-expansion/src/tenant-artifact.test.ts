@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { candidatesFromText, deduplicateArtifactCandidates, githubTenantQueries, matchCompanyNameSignal } from "./tenant-artifact.js";
+import { candidatesFromText, deduplicateArtifactCandidates, githubTenantQueries, matchCompanyNameSignal,
+  rotateTenantQueries } from "./tenant-artifact.js";
 
 describe("source tenant artifact", () => {
   it("shards GitHub queries without exceeding the configured 300-request design ceiling", () => {
@@ -9,6 +10,11 @@ describe("source tenant artifact", () => {
     expect(new Set(queries).size).toBe(queries.length);
     expect(queries.some((query) => query.includes("myworkdayjobs.com"))).toBe(true);
     expect(queries.some((query) => query.includes("greenhouse.io"))).toBe(true);
+  });
+
+  it("rotates shards deterministically so truncated weekly runs make forward progress", () => {
+    expect(rotateTenantQueries(["a", "b", "c", "d"], 5)).toEqual(["b", "c", "d", "a"]);
+    expect(rotateTenantQueries(["a", "b", "c", "d"], 9)).toEqual(["b", "c", "d", "a"]);
   });
 
   it("extracts all supported tenant URL families and ignores unrelated links", () => {

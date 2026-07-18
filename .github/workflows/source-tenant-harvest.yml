@@ -49,6 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_SEARCH_REQUEST_BUDGET: "300"
           GITHUB_SEARCH_PAGES_PER_QUERY: "10"
+          GITHUB_SEARCH_INTERVAL_MS: "10000"
       - uses: actions/upload-artifact@v4
         with:
           name: source-tenant-candidates-${{ github.run_id }}
