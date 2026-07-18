@@ -24,14 +24,16 @@ try {
     process.stdout.write(`${JSON.stringify({ mode: "dry-run", before }, null, 2)}\n`);
   } else {
     runId = await store.beginRun("quality_cleanup");
-    const unverifiedHidden = await hideUnverifiedFormalJobs();
+    const unverifiedHiddenBeforeResync = await hideUnverifiedFormalJobs();
     const sources = await missingParserSourceIds();
     const resync = await resyncSources(sources);
     const extraction = await reparseLatestRaw();
     const parserQuarantined = await quarantineUnrecoverableParserDebt();
     const canonicalShellsDeleted = await deleteCanonicalShells();
+    const unverifiedHiddenAfterResync = await hideUnverifiedFormalJobs();
     const after = await debtCounts();
-    const counters = { unverifiedHidden, sourcesQueuedForResync: sources.length, resync,
+    const counters = { unverifiedHidden: unverifiedHiddenBeforeResync + unverifiedHiddenAfterResync,
+      unverifiedHiddenBeforeResync, unverifiedHiddenAfterResync, sourcesQueuedForResync: sources.length, resync,
       reparsed: extraction.reparsed, rematerialized: extraction.rematerialized,
       parserQuarantined, canonicalShellsDeleted, before, after };
     await store.finishRun(runId, "succeeded", counters, resync.errors);
