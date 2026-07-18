@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig*.json ./
+COPY config ./config
 COPY packages ./packages
 COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
