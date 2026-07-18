@@ -5,7 +5,7 @@ After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-p
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/japan-job-agent
+WorkingDirectory=/opt/japan-job-agent/tmp/current-release
 TimeoutStartSec=4h
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm db:migrate
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm freshness:apply
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm db:migrate
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm freshness:apply

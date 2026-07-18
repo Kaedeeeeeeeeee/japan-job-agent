@@ -5,10 +5,10 @@ After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-p
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/japan-job-agent
+WorkingDirectory=/opt/japan-job-agent/tmp/current-release
 EnvironmentFile=-/opt/japan-job-agent/deploy/linux/.env
 TimeoutStartSec=6h
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-talentio
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-public-ats
-ExecStart=/bin/sh -c 'test "$${SOURCE_EXPANSION_ENABLED:-false}" != true || exec /usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm source:promote-ranked --target 5500'
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm temporal:schedules
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-talentio
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-public-ats
+ExecStart=/bin/sh -c 'test "$${SOURCE_EXPANSION_ENABLED:-false}" != true || exec /usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm source:promote-ranked --target 5500'
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm temporal:schedules

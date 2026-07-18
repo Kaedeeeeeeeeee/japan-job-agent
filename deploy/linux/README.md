@@ -26,7 +26,9 @@ curl --fail "http://${TAILSCALE_BIND_IP}:3001/health/ready"
 
 Use `tailscale serve --bg --https=443 http://127.0.0.1:3000` when MagicDNS HTTPS is preferred. Keep the WAN firewall closed. For recovery, restore a verified logical backup before starting API and Worker.
 
-Copy the systemd units and timers from `deploy/linux/systemd/` to `/etc/systemd/system/`, adjust `WorkingDirectory`, then enable them:
+Point `/opt/japan-job-agent/tmp/current-release` at a clean detached release worktree. Copy the systemd units and timers
+from that release's `deploy/linux/systemd/` to `/etc/systemd/system/`, then enable them. The units execute code from the
+clean release while continuing to read the private `/opt/japan-job-agent/deploy/linux/.env` file:
 
 ```bash
 sudo systemctl daemon-reload

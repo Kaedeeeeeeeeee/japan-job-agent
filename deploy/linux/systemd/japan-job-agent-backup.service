@@ -5,5 +5,5 @@ After=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/japan-job-agent
-ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml --profile maintenance run --rm backup
+WorkingDirectory=/opt/japan-job-agent/tmp/current-release
+ExecStart=/usr/bin/docker compose --env-file /opt/japan-job-agent/deploy/linux/.env -f deploy/linux/compose.yml --profile maintenance run --rm backup

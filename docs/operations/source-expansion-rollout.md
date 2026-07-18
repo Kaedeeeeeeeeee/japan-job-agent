@@ -13,7 +13,9 @@ This runbook lowers Engage's valid-candidate share without deleting Engage and r
 
 ## Rollout order
 
-1. Keep `ENGAGE_DISCOVERY_MODE=active` and `SOURCE_EXPANSION_ENABLED=false` while deploying the migration and code.
+1. Create a clean detached worktree at `/opt/japan-job-agent/tmp/deploy-<sha>` and atomically point
+   `/opt/japan-job-agent/tmp/current-release` at it. Keep `ENGAGE_DISCOVERY_MODE=active` and
+   `SOURCE_EXPANSION_ENABLED=false` while deploying the migration and code. Never copy release files over the dirty root worktree.
 2. Create and verify a PostgreSQL logical backup. Record its size and SHA-256 outside the database.
 3. Run `pnpm db:migrate`, restart the worker only after migration succeeds, and verify API, PostgreSQL, Temporal, and worker health.
 4. Download the weekly `source-tenant-candidates-*` GitHub Actions artifact. Treat the JSON as untrusted input.
