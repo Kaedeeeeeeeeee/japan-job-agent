@@ -5,6 +5,7 @@ import {
   deduplicateArtifactCandidates,
   githubTenantQueries,
   matchCompanyNameSignal,
+  rotateTenantQueries,
   tenantCandidateArtifactSchema,
   type TenantCandidateArtifactItem,
 } from "../packages/source-expansion/src/tenant-artifact.js";
@@ -35,6 +36,7 @@ const outputPath = path.resolve(valueAfter("--output") ?? "tmp/source-tenant-can
 const summaryPath = path.resolve(valueAfter("--summary") ?? "tmp/source-tenant-candidates.md");
 const requestBudget = positiveInteger(process.env.GITHUB_SEARCH_REQUEST_BUDGET, 300, 300);
 const maximumPagesPerQuery = positiveInteger(process.env.GITHUB_SEARCH_PAGES_PER_QUERY, 10, 10);
+const searchIntervalMs = Math.max(10_000, positiveInteger(process.env.GITHUB_SEARCH_INTERVAL_MS, 10_000, 60_000));
 const jpxNames = await readJpxNames(valueAfter("--jpx-csv"));
 let requestsUsed = 0;
 let metadataRequestsUsed = 0;
@@ -43,8 +45,9 @@ const repositoryCache = new Map<string, Promise<SearchRepository>>();
 let truncated = false;
 const candidates: TenantCandidateArtifactItem[] = [];
 
+const queries = rotateTenantQueries(githubTenantQueries(), Number(process.env.GITHUB_RUN_ID ?? 0));
 search:
-for (const query of githubTenantQueries()) {
+for (const query of queries) {
   for (let page = 1; page <= maximumPagesPerQuery; page += 1) {
     if (requestsUsed >= requestBudget) {
       truncated = true;
@@ -71,7 +74,7 @@ for (const query of githubTenantQueries()) {
       const repository = await enrichedRepository(item.repository);
       candidates.push(...candidatesFromSearchItem({ ...item, ...(repository === undefined ? {} : { repository }) }, jpxNames));
     }
-    await delay(6_100);
+    await delay(searchIntervalMs);
     if (items.length < 100) break;
   }
   if (requestsUsed >= requestBudget) break;
@@ -197,7 +200,7 @@ async function githubFetch(url: URL): Promise<Response> {
     }
     const resetAt = Number(response.headers.get("x-ratelimit-reset") ?? 0) * 1_000;
     const retryAfter = Number(response.headers.get("retry-after") ?? 0) * 1_000;
-    const conservativeRateLimitDelay = rateLimited ? 65_000 : 0;
+    const conservativeRateLimitDelay = rateLimited ? 120_000 * 2 ** attempt : 0;
     await delay(Math.max(retryAfter, resetAt - Date.now() + 1_000,
       conservativeRateLimitDelay, 2 ** attempt * 5_000));
   }

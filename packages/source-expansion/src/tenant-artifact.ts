@@ -58,6 +58,12 @@ export function githubTenantQueries(): string[] {
   }).slice(0, 30);
 }
 
+export function rotateTenantQueries(queries: string[], seed: number): string[] {
+  if (queries.length === 0 || !Number.isSafeInteger(seed)) return [...queries];
+  const offset = ((seed % queries.length) + queries.length) % queries.length;
+  return [...queries.slice(offset), ...queries.slice(0, offset)];
+}
+
 export function candidatesFromText(
   text: string,
   evidence: Pick<TenantCandidateArtifactItem, "repositoryUrl" | "repositoryHomepage" | "repositoryCname"> = {},
