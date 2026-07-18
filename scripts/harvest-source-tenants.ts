@@ -37,6 +37,8 @@ const summaryPath = path.resolve(valueAfter("--summary") ?? "tmp/source-tenant-c
 const requestBudget = positiveInteger(process.env.GITHUB_SEARCH_REQUEST_BUDGET, 300, 300);
 const maximumPagesPerQuery = positiveInteger(process.env.GITHUB_SEARCH_PAGES_PER_QUERY, 10, 10);
 const searchIntervalMs = Math.max(10_000, positiveInteger(process.env.GITHUB_SEARCH_INTERVAL_MS, 10_000, 60_000));
+const harvestDeadline = Date.now() + positiveInteger(process.env.GITHUB_HARVEST_TIMEOUT_MS,
+  60 * 60_000, 70 * 60_000);
 const jpxNames = await readJpxNames(valueAfter("--jpx-csv"));
 let requestsUsed = 0;
 let metadataRequestsUsed = 0;
@@ -73,6 +75,10 @@ for (const query of queries) {
     for (const item of items) {
       const repository = await enrichedRepository(item.repository);
       candidates.push(...candidatesFromSearchItem({ ...item, ...(repository === undefined ? {} : { repository }) }, jpxNames));
+    }
+    if (Date.now() + searchIntervalMs >= harvestDeadline) {
+      truncated = true;
+      break search;
     }
     await delay(searchIntervalMs);
     if (items.length < 100) break;
@@ -182,6 +188,7 @@ function normalizeRepositoryIdentity(value: string): string {
 
 async function githubFetch(url: URL): Promise<Response> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (Date.now() >= harvestDeadline) throw new SearchStoppedError("GitHub harvest deadline reached");
     if (requestsUsed >= requestBudget) throw new SearchStoppedError("GitHub Search request budget exhausted");
     requestsUsed += 1;
     const response = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: {
@@ -201,8 +208,12 @@ async function githubFetch(url: URL): Promise<Response> {
     const resetAt = Number(response.headers.get("x-ratelimit-reset") ?? 0) * 1_000;
     const retryAfter = Number(response.headers.get("retry-after") ?? 0) * 1_000;
     const conservativeRateLimitDelay = rateLimited ? 120_000 * 2 ** attempt : 0;
-    await delay(Math.max(retryAfter, resetAt - Date.now() + 1_000,
-      conservativeRateLimitDelay, 2 ** attempt * 5_000));
+    const waitMilliseconds = Math.max(retryAfter, resetAt - Date.now() + 1_000,
+      conservativeRateLimitDelay, 2 ** attempt * 5_000);
+    if (Date.now() + waitMilliseconds >= harvestDeadline) {
+      throw new SearchStoppedError("GitHub rate-limit wait would exceed the harvest deadline");
+    }
+    await delay(waitMilliseconds);
   }
   throw new Error("GitHub code search retry budget exhausted");
 }
