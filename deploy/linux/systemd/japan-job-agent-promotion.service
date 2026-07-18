@@ -1,12 +1,14 @@
 [Unit]
 Description=Resolve and promote verified Discovery candidates
 Requires=docker.service
-After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-public-ats-refresh.service
+After=docker.service japan-job-agent-discovery-refresh.service japan-job-agent-public-ats-refresh.service japan-job-agent-source-expansion.service
 
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/japan-job-agent
+EnvironmentFile=-/opt/japan-job-agent/deploy/linux/.env
 TimeoutStartSec=6h
 ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-talentio
 ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:promote-public-ats
+ExecStart=/bin/sh -c 'test "$${SOURCE_EXPANSION_ENABLED:-false}" != true || exec /usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm source:promote-ranked --target 5500'
 ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm temporal:schedules

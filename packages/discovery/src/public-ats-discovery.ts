@@ -11,7 +11,7 @@ import { parsePublishedDateValue } from "../../freshness/src/job-freshness.js";
 import { classifyJapanLocation } from "./job-discovery-service.js";
 
 export interface PublicAtsTenantSeed {
-  kind: "smartrecruiters" | "lever" | "ashby" | "workday";
+  kind: "greenhouse" | "smartrecruiters" | "lever" | "ashby" | "workday";
   tenantKey: string;
   companyName?: string;
   officialReferrerUrl?: string;
@@ -106,6 +106,7 @@ export async function collectPublicAtsDiscovery(
 }
 
 export function publicAtsBaseUrl(kind: PublicAtsTenantSeed["kind"], tenantKey: string): string {
+  if (kind === "greenhouse") return `https://boards-api.greenhouse.io/v1/boards/${tenantKey}/jobs`;
   if (kind === "smartrecruiters") return `https://jobs.smartrecruiters.com/${tenantKey}`;
   if (kind === "lever") return `https://jobs.lever.co/${tenantKey}`;
   if (kind === "ashby") return `https://jobs.ashbyhq.com/${tenantKey}`;
@@ -133,6 +134,10 @@ function publicAtsCompany(kind: PublicAtsTenantSeed["kind"], value: Record<strin
 }
 
 function publicAtsLocation(kind: PublicAtsTenantSeed["kind"], value: Record<string, unknown>): string {
+  if (kind === "greenhouse") {
+    const location = isRecord(value.location) ? value.location : {};
+    return stringValues(location, ["name"]).join(", ");
+  }
   if (kind === "smartrecruiters") {
     const location = isRecord(value.location) ? value.location : {};
     return stringValues(location, ["fullLocation", "city", "region", "country"]).join(", ");
@@ -157,8 +162,11 @@ function publicAtsLocation(kind: PublicAtsTenantSeed["kind"], value: Record<stri
 
 function publicAtsPublished(kind: PublicAtsTenantSeed["kind"], value: Record<string, unknown>): JobDiscoveryLead["published"] {
   const workday = isRecord(value.jobPostingInfo) ? value.jobPostingInfo : {};
-  const raw = kind === "smartrecruiters" ? value.releasedDate : kind === "ashby" ? value.publishedAt
+  const raw = kind === "greenhouse" ? value.first_published : kind === "smartrecruiters" ? value.releasedDate : kind === "ashby" ? value.publishedAt
     : kind === "workday" ? workday.startDate : undefined;
+  if (kind === "lever" && typeof value.createdAt === "number" && Number.isFinite(value.createdAt)) {
+    return parsePublishedDateValue(new Date(value.createdAt).toISOString());
+  }
   return typeof raw === "string" ? parsePublishedDateValue(raw) : undefined;
 }
 
@@ -188,5 +196,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isPublicAtsKind(kind: SourceKind): kind is PublicAtsTenantSeed["kind"] {
-  return kind === "smartrecruiters" || kind === "lever" || kind === "ashby" || kind === "workday";
+  return kind === "greenhouse" || kind === "smartrecruiters" || kind === "lever" || kind === "ashby" || kind === "workday";
 }

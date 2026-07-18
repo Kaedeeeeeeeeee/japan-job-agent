@@ -116,6 +116,7 @@ try {
         continue;
       }
       await verifyPersistedSource(source);
+      await setScheduleInterval(source.sourceInstanceId, currentJobs);
       const materialized = await extractAndMaterialize(source.sourceInstanceId);
       const queued = await linkPromotedCandidates(group.tenantKey, source, group.candidateIds);
       queuedCandidates += queued;
@@ -252,6 +253,10 @@ async function verifyPersistedSource(source: SeededSource): Promise<void> {
       SELECT r.id,${source.relationshipId}::uuid,now() FROM source_job_records r
       WHERE r.source_instance_id=${source.sourceInstanceId}::uuid
       ON CONFLICT(source_job_record_id,company_source_relationship_id,valid_to) DO NOTHING`.execute(trx);
+    await sql`UPDATE canonical_jobs job SET lifecycle_state='active',updated_at=now()
+      FROM canonical_job_sources link JOIN source_job_records record ON record.id=link.source_job_record_id
+      WHERE link.canonical_job_id=job.id AND link.active_to IS NULL AND record.lifecycle_state='active'
+        AND record.source_instance_id=${source.sourceInstanceId}::uuid AND job.current_version_id IS NOT NULL`.execute(trx);
   });
 }
 
@@ -339,8 +344,16 @@ async function verifiedActiveCanonicalCount(): Promise<number> {
     JOIN source_instances s ON s.id=r.source_instance_id AND s.verification_state='verified'
     JOIN company_source_relationships csr ON csr.source_instance_id=s.id
       AND csr.verification_state='verified' AND csr.valid_to IS NULL
+    JOIN evidence ON evidence.company_source_relationship_id=csr.id
     WHERE cj.lifecycle_state='active'`.execute(db);
   return result.rows[0]?.count ?? 0;
+}
+
+async function setScheduleInterval(sourceInstanceId: string, currentJobs: number): Promise<void> {
+  await sql`INSERT INTO source_schedules(source_instance_id,interval_hours,stale_refresh_allowed)
+    VALUES (${sourceInstanceId}::uuid,${currentJobs >= 100 ? 12 : 24},true)
+    ON CONFLICT(source_instance_id) DO UPDATE SET interval_hours=excluded.interval_hours,
+      stale_refresh_allowed=true,updated_at=now()`.execute(db);
 }
 
 async function activeSourceJobCount(sourceInstanceId: string): Promise<number> {

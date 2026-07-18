@@ -145,3 +145,22 @@ DATABASE_URL=... pnpm sync:hrmos -- verified-tenant-key
 ```
 
 HRMOS, HERP, Jobcan, AirWork, engage, Talentio, and Workday are complete-collection connectors: they fetch every relevant detail body before the Orchestrator may finalize an authoritative snapshot. Workday discovery uses the public CXS careers endpoint with a Japan query, then reads each Japan detail record for the exact `startDate`; relative labels such as “Posted 30+ Days Ago” are never used as publication dates. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. Global Greenhouse boards retain complete snapshots while explicit overseas locations are deterministically excluded from recommendations. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md), [JETRO promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md), and [expanded corpus report](./docs/delivery/job-corpus-expansion-2026-07-14.md).
+
+## Engage share and trusted-source expansion
+
+The persistent source-tenant queue accepts only non-executable JSON artifacts. GitHub Actions harvests public references weekly; importing, scanning, verifying, and promoting remain explicit production operations. JPX and JETRO matches rank companies but never prove a job source. Promotion still requires a live backlink from an allowed official corporate domain to the exact ATS tenant.
+
+```bash
+# Review an artifact without writing, then import it idempotently.
+DATABASE_URL=... pnpm source:import-tenants tmp/source-tenant-candidates.json --dry-run
+DATABASE_URL=... pnpm source:import-tenants tmp/source-tenant-candidates.json --apply
+
+# Scan 400 tenants, first for 30 days; auto enters 183 days only for already verified sources
+# after the queue is exhausted and two low-growth runs are recorded.
+DATABASE_URL=... pnpm source:scan-tenants --backfill-days 30 --batch 400
+DATABASE_URL=... RAW_STORAGE_PATH=.data pnpm source:promote-ranked --target 5500
+
+# Cleanup is dry-run by default. Acceptance requires two consecutive Tokyo calendar days.
+DATABASE_URL=... pnpm source:clean-quality-debt --dry-run
+DATABASE_URL=... pnpm acceptance:source-expansion
+```

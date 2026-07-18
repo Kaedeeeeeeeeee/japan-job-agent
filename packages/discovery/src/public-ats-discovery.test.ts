@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { AshbyConnector } from "../../connectors-public-ats/src/public-ats-connectors.js";
+import { AshbyConnector, LeverConnector } from "../../connectors-public-ats/src/public-ats-connectors.js";
 import { WorkdayConnector } from "../../connectors-workday/src/workday-connector.js";
 import { collectPublicAtsDiscovery } from "./public-ats-discovery.js";
 
@@ -50,5 +50,18 @@ describe("public ATS discovery", () => {
     expect(result.leads[0]).toMatchObject({ companyName: "Sony", title: "AI Engineer",
       published: { value: "2026-07-16", precision: "date" } });
     expect(result.excludedNonJapan).toBe(1);
+  });
+
+  it("uses Lever's explicit createdAt timestamp instead of observation time", async () => {
+    const createdAt = Date.parse("2026-07-12T00:00:00Z");
+    const connector = new LeverConnector(async () => new Response(JSON.stringify([{
+      id: "job-1", text: "Engineer", hostedUrl: "https://jobs.lever.co/acme/job-1", createdAt,
+      categories: { location: "Tokyo, Japan" },
+    }]), { status: 200, headers: { "content-type": "application/json" } }));
+    const source = { id: randomUUID(), sourceKind: "lever" as const, tenantKey: "acme",
+      baseUrl: "https://jobs.lever.co/acme" };
+    const result = await collectPublicAtsDiscovery(connector, source, { kind: "lever", tenantKey: "acme" },
+      randomUUID(), AbortSignal.timeout(1_000));
+    expect(result.leads[0]?.published).toEqual({ value: "2026-07-12T00:00:00.000Z", precision: "datetime" });
   });
 });

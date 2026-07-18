@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
+import { GreenhouseConnector } from "../packages/connectors-greenhouse/src/greenhouse-connector.js";
 import { AshbyConnector, LeverConnector, SmartRecruitersConnector } from "../packages/connectors-public-ats/src/public-ats-connectors.js";
 import { WorkdayConnector, workdayTenantKey } from "../packages/connectors-workday/src/workday-connector.js";
 import type { SourceConnector, SourceInstanceRef } from "../packages/contracts/src/index.js";
@@ -40,7 +41,7 @@ try {
   const seeds = limitTenantSeeds(availableSeeds, maximumTenants);
   const sources = await ensureDiscoverySources();
   const grouped = Map.groupBy(seeds, (seed) => seed.kind);
-  const results = await Promise.all((["smartrecruiters", "lever", "ashby", "workday"] as const).map(async (kind) => {
+  const results = await Promise.all((["greenhouse", "smartrecruiters", "lever", "ashby", "workday"] as const).map(async (kind) => {
     if (!await sourceEnabled(sources[kind])) return [];
     const connector = connectorFor(kind, atsFetch);
     const rows = [];
@@ -121,6 +122,7 @@ try {
 
 async function ensureDiscoverySources(): Promise<Record<PublicAtsTenantSeed["kind"], string>> {
   const values: Array<[PublicAtsTenantSeed["kind"], string, string]> = [
+    ["greenhouse", "Greenhouse public Job Board API", "https://boards-api.greenhouse.io/v1/boards/"],
     ["smartrecruiters", "SmartRecruiters public Posting API", "https://api.smartrecruiters.com/v1/companies/"],
     ["lever", "Lever public Postings API", "https://api.lever.co/v0/postings/"],
     ["ashby", "Ashby public Job Postings API", "https://api.ashbyhq.com/posting-api/job-board/"],
@@ -146,6 +148,7 @@ async function sourceEnabled(discoverySourceId: string): Promise<boolean> {
 
 async function discoverGithubTenants(token: string): Promise<PublicAtsTenantSeed[]> {
   const hosts: Array<[PublicAtsTenantSeed["kind"], string]> = [
+    ["greenhouse", "greenhouse.io/"],
     ["smartrecruiters", "jobs.smartrecruiters.com/"],
     ["lever", "jobs.lever.co/"],
     ["ashby", "jobs.ashbyhq.com/"],
@@ -196,8 +199,9 @@ export function tenantsFromText(kind: PublicAtsTenantSeed["kind"], text: string)
         ? [] : [`${host.toLowerCase()}/${site}`];
     });
   }
-  const host = kind === "smartrecruiters" ? "jobs\\.smartrecruiters\\.com"
-    : kind === "lever" ? "jobs\\.lever\\.co" : "jobs\\.ashbyhq\\.com";
+  const host = kind === "greenhouse" ? "(?:boards-api|job-boards)\\.greenhouse\\.io(?:/v1/boards)?"
+    : kind === "smartrecruiters" ? "jobs\\.smartrecruiters\\.com"
+      : kind === "lever" ? "jobs\\.lever\\.co" : "jobs\\.ashbyhq\\.com";
   const pattern = new RegExp(`https?://${host}/([A-Za-z0-9._-]+)`, "g");
   return [...text.matchAll(pattern)].map((match) => match[1]).filter((value): value is string => value !== undefined)
     .filter((value) => !["api", "assets", "static"].includes(value.toLowerCase()));
@@ -224,7 +228,7 @@ function deduplicateSeeds(values: PublicAtsTenantSeed[]): PublicAtsTenantSeed[] 
 }
 
 export function limitTenantSeeds(values: PublicAtsTenantSeed[], maximum: number): PublicAtsTenantSeed[] {
-  const kinds = ["smartrecruiters", "lever", "ashby", "workday"] as const;
+  const kinds = ["greenhouse", "smartrecruiters", "lever", "ashby", "workday"] as const;
   const perFamily = Math.ceil(maximum / kinds.length);
   return kinds.flatMap((kind) => values.filter((value) => value.kind === kind).slice(0, perFamily)).slice(0, maximum);
 }
@@ -284,7 +288,8 @@ function tenantSeedFromBaseUrl(rawUrl: string): PublicAtsTenantSeed | null {
 }
 
 function connectorFor(kind: PublicAtsTenantSeed["kind"], fetchImplementation: typeof fetch): SourceConnector {
-  return kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
+  return kind === "greenhouse" ? new GreenhouseConnector(fetchImplementation)
+    : kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
     : kind === "lever" ? new LeverConnector(fetchImplementation)
       : kind === "ashby" ? new AshbyConnector(fetchImplementation)
         : new WorkdayConnector(fetchImplementation, 8 * 1024 * 1024, "Japan");
