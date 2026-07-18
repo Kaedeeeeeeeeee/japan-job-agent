@@ -28,6 +28,8 @@ interface SearchItem {
   text_matches?: Array<{ fragment?: string }>;
 }
 
+class SearchStoppedError extends Error {}
+
 const token = required("GITHUB_TOKEN");
 const outputPath = path.resolve(valueAfter("--output") ?? "tmp/source-tenant-candidates.json");
 const summaryPath = path.resolve(valueAfter("--summary") ?? "tmp/source-tenant-candidates.md");
@@ -41,6 +43,7 @@ const repositoryCache = new Map<string, Promise<SearchRepository>>();
 let truncated = false;
 const candidates: TenantCandidateArtifactItem[] = [];
 
+search:
 for (const query of githubTenantQueries()) {
   for (let page = 1; page <= maximumPagesPerQuery; page += 1) {
     if (requestsUsed >= requestBudget) {
@@ -51,8 +54,16 @@ for (const query of githubTenantQueries()) {
     url.searchParams.set("q", query);
     url.searchParams.set("per_page", "100");
     url.searchParams.set("page", String(page));
-    const response = await githubFetch(url);
-    requestsUsed += 1;
+    let response: Response;
+    try {
+      response = await githubFetch(url);
+    } catch (error) {
+      if (error instanceof SearchStoppedError) {
+        truncated = true;
+        break search;
+      }
+      throw error;
+    }
     const payload = await response.json() as { items?: SearchItem[]; incomplete_results?: boolean };
     const items = payload.items ?? [];
     if (payload.incomplete_results === true) truncated = true;
@@ -60,8 +71,8 @@ for (const query of githubTenantQueries()) {
       const repository = await enrichedRepository(item.repository);
       candidates.push(...candidatesFromSearchItem({ ...item, ...(repository === undefined ? {} : { repository }) }, jpxNames));
     }
-    if (items.length < 100) break;
     await delay(6_100);
+    if (items.length < 100) break;
   }
   if (requestsUsed >= requestBudget) break;
 }
@@ -168,6 +179,8 @@ function normalizeRepositoryIdentity(value: string): string {
 
 async function githubFetch(url: URL): Promise<Response> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (requestsUsed >= requestBudget) throw new SearchStoppedError("GitHub Search request budget exhausted");
+    requestsUsed += 1;
     const response = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: {
       authorization: `Bearer ${token}`,
       accept: "application/vnd.github.text-match+json",
@@ -175,12 +188,18 @@ async function githubFetch(url: URL): Promise<Response> {
       "user-agent": "JapanJobAgent/0.2 source tenant harvester",
     } });
     if (response.ok) return response;
-    if (![403, 429, 500, 502, 503, 504].includes(response.status) || attempt === 3) {
+    const retryable = [403, 429, 500, 502, 503, 504].includes(response.status);
+    const rateLimited = response.status === 429 || (response.status === 403
+      && Number(response.headers.get("x-ratelimit-remaining") ?? 1) === 0);
+    if (!retryable || attempt === 3) {
+      if (rateLimited) throw new SearchStoppedError(`GitHub code search stopped at HTTP ${response.status}`);
       throw new Error(`GitHub code search failed with HTTP ${response.status}`);
     }
     const resetAt = Number(response.headers.get("x-ratelimit-reset") ?? 0) * 1_000;
     const retryAfter = Number(response.headers.get("retry-after") ?? 0) * 1_000;
-    await delay(Math.max(retryAfter, resetAt - Date.now() + 1_000, 2 ** attempt * 5_000));
+    const conservativeRateLimitDelay = rateLimited ? 65_000 : 0;
+    await delay(Math.max(retryAfter, resetAt - Date.now() + 1_000,
+      conservativeRateLimitDelay, 2 ** attempt * 5_000));
   }
   throw new Error("GitHub code search retry budget exhausted");
 }
