@@ -14,16 +14,34 @@ import {
   parseSitemapIndex,
   parseTalentioDetail,
   parseYoloListingPage,
+  type SitemapEntry,
 } from "../packages/discovery/src/sitemap-job-discovery.js";
+import { parsePublishedDateValue } from "../packages/freshness/src/job-freshness.js";
 import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
+import { normalizeApplicationUrl } from "../packages/canonical/src/normalize-application-url.js";
+import {
+  discoveryBackfillWindow,
+  evaluateLeadForBackfill,
+} from "../packages/freshness/src/discovery-backfill-window.js";
 
 const databaseUrl = required("DATABASE_URL");
-const hostIntervalMs = Math.max(1_000, positiveInteger(process.env.SITEMAP_HOST_INTERVAL_MS, 1_000));
-const yoloTarget = positiveInteger(process.env.YOLO_DISCOVERY_TARGET, 3_050);
-const talentioTarget = positiveInteger(process.env.TALENTIO_DISCOVERY_TARGET, 3_300);
-const engageTarget = positiveInteger(process.env.ENGAGE_DISCOVERY_TARGET, 3_300);
+const hostIntervalMs = Math.max(125, positiveInteger(process.env.SITEMAP_HOST_INTERVAL_MS, 1_000));
+const yoloMaxListingsPerRun = positiveInteger(
+  process.env.YOLO_DISCOVERY_MAX_LISTINGS_PER_RUN ?? process.env.YOLO_DISCOVERY_TARGET,
+  10_000,
+);
+const talentioMaxDetailsPerRun = positiveInteger(
+  process.env.TALENTIO_DISCOVERY_MAX_DETAILS_PER_RUN ?? process.env.TALENTIO_DISCOVERY_TARGET,
+  5_000,
+);
+const engageMaxDetailsPerRun = positiveInteger(
+  process.env.ENGAGE_DISCOVERY_MAX_DETAILS_PER_RUN ?? process.env.ENGAGE_DISCOVERY_TARGET,
+  5_000,
+);
+const engageDetailConcurrency = Math.min(8, positiveInteger(process.env.ENGAGE_DISCOVERY_CONCURRENCY, 1));
 const enabled = new Set((process.env.SITEMAP_DISCOVERY_FAMILIES ?? "yolo_japan,talentio,engage")
   .split(",").map((value) => value.trim()).filter(Boolean));
+const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 const discovery = new JobDiscoveryService(db);
@@ -37,7 +55,11 @@ try {
   const collectors = await Promise.all(jobs);
   const summary = await discovery.summary();
   const distribution = await sourceFamilyDistribution();
-  const report = { generatedAt: new Date().toISOString(), hostIntervalMs, collectors, summary, distribution };
+  const report = { generatedAt: new Date().toISOString(), hostIntervalMs,
+    publicationWindow: backfillWindow === null ? null : {
+      days: backfillWindow.days, cutoffDate: backfillWindow.cutoffDate, today: backfillWindow.today,
+    },
+    collectors, summary, distribution };
   await replaceWithAtomicFile(path.resolve("tmp/sitemap-job-discovery-report.json"), (temporaryPath) =>
     fs.writeFile(temporaryPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }));
   process.stdout.write(`${JSON.stringify(report)}\n`);
@@ -47,12 +69,23 @@ try {
 
 interface CollectorReport {
   family: string;
-  target: number;
+  maximumPerRun: number;
+  concurrency?: number;
+  processed: number;
   fetchedPages: number;
   parsedLeads: number;
   admitted: number;
+  created: number;
+  excludedUnknownPublication: number;
+  excludedOutsideWindow: number;
+  prefilteredBySitemapLastModified: number;
   failures: number;
   validAfter: number;
+}
+
+interface WindowExclusions {
+  unknownPublication: number;
+  outsideWindow: number;
 }
 
 async function runYolo(discoverySourceId: string): Promise<CollectorReport> {
@@ -63,14 +96,17 @@ async function runYolo(discoverySourceId: string): Promise<CollectorReport> {
   const categoryUrls = listingLinks(root, rootUrl, /^\/ja\/sitemap\/job-category\/\d+$/);
   const areaUrls = listingLinks(root, rootUrl, /^\/ja\/sitemap\/area\/\d+$/);
   const targetIds = new Set<string>();
+  const existingDatedIds = backfillWindow === null ? new Set<string>() : await datedExternalPostingIds("yolo_japan");
   const observedTwice = new Set<string>();
   let parsedLeads = 0;
   let admitted = 0;
+  let created = 0;
+  const excluded: WindowExclusions = { unknownPublication: 0, outsideWindow: 0 };
   let failures = 0;
 
   const categoryQueue = [...categoryUrls];
   const visitedCategory = new Set<string>();
-  while (categoryQueue.length > 0 && targetIds.size < yoloTarget) {
+  while (categoryQueue.length > 0 && targetIds.size < yoloMaxListingsPerRun) {
     const url = categoryQueue.shift()!;
     if (visitedCategory.has(url)) continue;
     visitedCategory.add(url);
@@ -80,17 +116,23 @@ async function runYolo(discoverySourceId: string): Promise<CollectorReport> {
       const page = parseYoloListingPage(bytes, discoverySourceId, url, new Date().toISOString());
       page.nextPageUrls.filter((next) => !visitedCategory.has(next)).forEach((next) => categoryQueue.push(next));
       for (const lead of page.leads) {
-        if (targetIds.size >= yoloTarget) break;
+        if (targetIds.size >= yoloMaxListingsPerRun) break;
         parsedLeads += 1;
+        if (lead.externalPostingId !== undefined && existingDatedIds.has(lead.externalPostingId)) continue;
+        if (excludeFromBackfill(lead, excluded)) continue;
         const result = await discovery.ingest(lead);
-        if (lead.externalPostingId !== undefined) targetIds.add(lead.externalPostingId);
+        if (result.candidateCreated) created += 1;
+        if (lead.externalPostingId !== undefined && result.disposition !== "tombstoned") {
+          targetIds.add(lead.externalPostingId);
+          existingDatedIds.add(lead.externalPostingId);
+        }
         if (result.countable) admitted += 1;
       }
     } catch (error) {
       failures += 1;
       progressError("yolo_japan", url, error);
     }
-    progress("yolo_japan", targetIds.size, yoloTarget, fetchedPages);
+    progress("yolo_japan", targetIds.size, yoloMaxListingsPerRun, fetchedPages);
   }
 
   const areaQueue = [...areaUrls];
@@ -119,7 +161,10 @@ async function runYolo(discoverySourceId: string): Promise<CollectorReport> {
     }
     progress("yolo_japan-second-observation", observedTwice.size, targetIds.size, fetchedPages);
   }
-  return { family: "yolo_japan", target: yoloTarget, fetchedPages, parsedLeads, admitted, failures,
+  return { family: "yolo_japan", maximumPerRun: yoloMaxListingsPerRun, processed: targetIds.size,
+    fetchedPages, parsedLeads, admitted, created,
+    excludedUnknownPublication: excluded.unknownPublication, excludedOutsideWindow: excluded.outsideWindow,
+    prefilteredBySitemapLastModified: 0, failures,
     validAfter: await familyValidCount("yolo_japan") };
 }
 
@@ -127,40 +172,50 @@ async function runTalentio(discoverySourceId: string): Promise<CollectorReport> 
   const throttle = hostThrottle("open.talentio.com");
   const sitemapUrl = "https://open.talentio.com/sitemap.xml";
   const sitemap = await throttle.fetch(sitemapUrl);
-  const entries = parseSitemapEntries(sitemap, "open.talentio.com")
+  const allEntries = parseSitemapEntries(sitemap, "open.talentio.com")
     .filter((entry) => /^\/r\/1\/c\/[^/]+\/pages\/\d+\/?$/.test(new URL(entry.url).pathname))
     .sort((left, right) => (right.lastModified ?? "").localeCompare(left.lastModified ?? "") || left.url.localeCompare(right.url));
+  const entries = allEntries.filter(sitemapEntryMayBeInBackfill);
+  const prefilteredBySitemapLastModified = allEntries.length - entries.length;
   const sitemapHash = sha256(sitemap);
   const snapshotDate = new Date().toISOString().slice(0, 10);
   const importRunId = await discovery.recordFinalizedAuthoritativeImport({
     discoverySourceId,
     idempotencyKey: `talentio:sitemap:${snapshotDate}:${sitemapHash}`,
     pageCount: 1,
-    providerTotal: entries.length,
-    discoveredCount: entries.length,
+    providerTotal: allEntries.length,
+    discoveredCount: allEntries.length,
     rawHash: sitemapHash,
     validation: { allPagesCompleted: true, tenantIdentityConsistent: true, providerTotalMatched: true, parseErrors: [] },
   });
-  await observeExistingTalentioSnapshot(discoverySourceId, importRunId, snapshotDate, sitemapHash, entries);
+  await observeExistingTalentioSnapshot(discoverySourceId, importRunId, snapshotDate, sitemapHash, allEntries);
   const known = await observationKeys("talentio");
+  const tombstones = await retentionDetailUrlHashes();
   let valid = await familyValidCount("talentio");
   let fetchedPages = 1;
   let parsedLeads = 0;
   let admitted = 0;
+  let created = 0;
+  const excluded: WindowExclusions = { unknownPublication: 0, outsideWindow: 0 };
   let failures = 0;
+  let processed = 0;
   for (const entry of entries) {
-    if (valid >= talentioTarget) break;
+    if (processed >= talentioMaxDetailsPerRun) break;
     const externalId = new URL(entry.url).pathname.split("/").filter(Boolean).at(-1);
     if (externalId === undefined) continue;
+    if (tombstones.has(detailUrlHash(entry.url))) continue;
     const observationKey = `talentio:sitemap:${externalId}:${entry.lastModified ?? "undated"}`;
     if (known.has(observationKey)) continue;
     try {
+      processed += 1;
       const bytes = await throttle.fetch(entry.url);
       fetchedPages += 1;
       const lead = await parseTalentioDetail(bytes, discoverySourceId, entry.url, entry.lastModified, new Date().toISOString());
       if (lead === null) continue;
       parsedLeads += 1;
+      if (excludeFromBackfill(lead, excluded)) continue;
       const result = await discovery.ingest({ ...lead, discoveryImportRunId: importRunId });
+      if (result.candidateCreated) created += 1;
       known.add(observationKey);
       if (result.countable) {
         admitted += 1;
@@ -170,9 +225,12 @@ async function runTalentio(discoverySourceId: string): Promise<CollectorReport> 
       failures += 1;
       progressError("talentio", entry.url, error);
     }
-    progress("talentio", valid, talentioTarget, fetchedPages);
+    progress("talentio-new-details", processed, talentioMaxDetailsPerRun, fetchedPages);
   }
-  return { family: "talentio", target: talentioTarget, fetchedPages, parsedLeads, admitted, failures,
+  return { family: "talentio", maximumPerRun: talentioMaxDetailsPerRun, processed,
+    fetchedPages, parsedLeads, admitted, created,
+    excludedUnknownPublication: excluded.unknownPublication, excludedOutsideWindow: excluded.outsideWindow,
+    prefilteredBySitemapLastModified, failures,
     validAfter: await familyValidCount("talentio") };
 }
 
@@ -187,7 +245,8 @@ async function observeExistingTalentioSnapshot(
   const candidates = (await sql<{ id: string; tenant_key: string; external_posting_id: string }>`SELECT
       id,tenant_key,external_posting_id FROM job_discovery_candidates
     WHERE source_family='talentio' AND tenant_key IS NOT NULL AND external_posting_id IS NOT NULL
-      AND discovery_source_id=${discoverySourceId}::uuid AND state NOT IN ('rejected','expired')`.execute(db)).rows;
+      AND discovery_source_id=${discoverySourceId}::uuid AND state NOT IN ('rejected','expired')
+      AND publication_freshness='recent'`.execute(db)).rows;
   const observedAt = new Date().toISOString();
   for (const candidate of candidates) {
     const identity = `${candidate.tenant_key}:${candidate.external_posting_id}`;
@@ -216,44 +275,64 @@ async function runEngage(discoverySourceId: string): Promise<CollectorReport> {
   const index = await throttle.fetch(indexUrl);
   const sitemapUrls = parseSitemapIndex(index, "en-gage.net").sort().reverse();
   const known = await observationKeys("engage");
+  const existingDatedIds = backfillWindow === null ? new Set<string>() : await datedExternalPostingIds("engage");
+  const tombstones = await retentionDetailUrlHashes();
   let valid = await familyValidCount("engage");
   let fetchedPages = 1;
   let parsedLeads = 0;
   let admitted = 0;
+  let created = 0;
+  const excluded: WindowExclusions = { unknownPublication: 0, outsideWindow: 0 };
   let failures = 0;
+  let processed = 0;
+  let prefilteredBySitemapLastModified = 0;
   for (const sitemapUrl of sitemapUrls) {
-    if (valid >= engageTarget) break;
+    if (processed >= engageMaxDetailsPerRun) break;
     let entries;
     try {
       const compressed = await throttle.fetch(sitemapUrl);
       fetchedPages += 1;
-      entries = parseSitemapEntries(maybeGunzip(compressed), "en-gage.net")
+      const allEntries = parseSitemapEntries(maybeGunzip(compressed), "en-gage.net")
         .filter((entry) => /^\/user\/search\/desc\/\d+\/?$/.test(new URL(entry.url).pathname))
         .sort((left, right) => (right.lastModified ?? "").localeCompare(left.lastModified ?? ""));
+      entries = allEntries.filter(sitemapEntryMayBeInBackfill);
+      prefilteredBySitemapLastModified += allEntries.length - entries.length;
     } catch (error) {
       failures += 1;
       progressError("engage", sitemapUrl, error);
       continue;
     }
+    const work: Array<{ entry: SitemapEntry; detailKey: string; sitemapKey: string; sequence: number }> = [];
     for (const entry of entries) {
-      if (valid >= engageTarget) break;
+      if (processed + work.length >= engageMaxDetailsPerRun) break;
       const externalId = new URL(entry.url).pathname.match(/\/(\d+)\/?$/)?.[1];
       if (externalId === undefined) continue;
+      if (tombstones.has(detailUrlHash(entry.url))) continue;
+      if (existingDatedIds.has(externalId)) continue;
       const observationDate = new Date().toISOString().slice(0, 10);
       const detailKey = `engage:detail:${externalId}:${entry.lastModified ?? "undated"}:${observationDate}`;
       const sitemapKey = `engage:sitemap:${externalId}:${entry.lastModified ?? "undated"}:${observationDate}`;
       if (known.has(detailKey) && known.has(sitemapKey)) continue;
+      work.push({ entry, detailKey, sitemapKey, sequence: processed + work.length + 1 });
+    }
+    processed += work.length;
+    await mapWithConcurrency(work, engageDetailConcurrency, async ({ entry, detailKey, sitemapKey, sequence }) => {
       try {
         const bytes = await throttle.fetch(entry.url);
         fetchedPages += 1;
         const lead = parseEngageDetail(bytes, discoverySourceId, entry.url, sitemapUrl, entry.lastModified,
           new Date().toISOString());
-        if (lead === null) continue;
+        if (lead === null) return;
         parsedLeads += 1;
-        await discovery.ingest({ ...lead, observationKey: sitemapKey,
+        if (excludeFromBackfill(lead, excluded)) return;
+        const sitemapResult = await discovery.ingest({ ...lead, observationKey: sitemapKey,
           responseMetadata: { ...lead.responseMetadata, observationKind: "sitemap_presence" } });
         const result = await discovery.ingest({ ...lead, observationKey: detailKey,
           responseMetadata: { ...lead.responseMetadata, observationKind: "detail_fetch" } });
+        if (sitemapResult.candidateCreated || result.candidateCreated) created += 1;
+        if (lead.externalPostingId !== undefined && result.disposition !== "tombstoned") {
+          existingDatedIds.add(lead.externalPostingId);
+        }
         known.add(sitemapKey);
         known.add(detailKey);
         if (result.countable) {
@@ -263,24 +342,56 @@ async function runEngage(discoverySourceId: string): Promise<CollectorReport> {
       } catch (error) {
         failures += 1;
         progressError("engage", entry.url, error);
+      } finally {
+        progress("engage-new-details", sequence, engageMaxDetailsPerRun, fetchedPages);
       }
-      progress("engage", valid, engageTarget, fetchedPages);
-    }
+    });
   }
-  return { family: "engage", target: engageTarget, fetchedPages, parsedLeads, admitted, failures,
+  return { family: "engage", maximumPerRun: engageMaxDetailsPerRun, concurrency: engageDetailConcurrency, processed,
+    fetchedPages, parsedLeads, admitted, created,
+    excludedUnknownPublication: excluded.unknownPublication, excludedOutsideWindow: excluded.outsideWindow,
+    prefilteredBySitemapLastModified, failures,
     validAfter: await familyValidCount("engage") };
+}
+
+function excludeFromBackfill(lead: JobDiscoveryLead, counts: WindowExclusions): boolean {
+  const decision = evaluateLeadForBackfill(lead, backfillWindow);
+  if (decision === null || decision.eligible) return false;
+  if (decision.reason === "publication_date_unknown") counts.unknownPublication += 1;
+  else counts.outsideWindow += 1;
+  return true;
+}
+
+function sitemapEntryMayBeInBackfill(entry: SitemapEntry): boolean {
+  if (backfillWindow === null || entry.lastModified === undefined) return true;
+  const published = parsePublishedDateValue(entry.lastModified);
+  if (published === undefined) return true;
+  const decision = evaluateLeadForBackfill({ published }, backfillWindow);
+  return decision?.reason !== "published_before_lookback_window";
+}
+
+async function datedExternalPostingIds(sourceFamily: string): Promise<Set<string>> {
+  const result = await sql<{ external_posting_id: string }>`SELECT external_posting_id
+    FROM job_discovery_candidates WHERE source_family=${sourceFamily} AND external_posting_id IS NOT NULL
+      AND content_purged_at IS NULL AND source_published_precision IS NOT NULL`.execute(db);
+  return new Set(result.rows.map((row) => row.external_posting_id));
 }
 
 function hostThrottle(expectedHost: string): { fetch: (url: string) => Promise<Uint8Array> } {
   let nextAllowedAt = 0;
+  let startQueue = Promise.resolve();
   return { fetch: async (rawUrl: string) => {
     const url = new URL(rawUrl);
     if (url.protocol !== "https:" || url.hostname !== expectedHost || url.username !== "" || url.password !== "") {
       throw new Error(`Blocked URL outside https://${expectedHost}: ${rawUrl}`);
     }
-    const delayMs = Math.max(0, nextAllowedAt - Date.now());
-    if (delayMs > 0) await delay(delayMs);
-    nextAllowedAt = Date.now() + hostIntervalMs;
+    const start = startQueue.then(async () => {
+      const delayMs = Math.max(0, nextAllowedAt - Date.now());
+      if (delayMs > 0) await delay(delayMs);
+      nextAllowedAt = Date.now() + hostIntervalMs;
+    });
+    startQueue = start.catch(() => undefined);
+    await start;
     return fetchWithRetry(url, expectedHost);
   } };
 }
@@ -311,9 +422,26 @@ async function fetchWithRetry(url: URL, expectedHost: string, attempt = 0): Prom
   if (!response.ok) throw new Error(`${response.status} from ${url}`);
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (declared > 10 * 1024 * 1024) throw new Error(`Response exceeds 10 MiB: ${url}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  const bytes = new Uint8Array(await responseBodyWithTimeout(response, url, 60_000));
   if (bytes.byteLength === 0 || bytes.byteLength > 10 * 1024 * 1024) throw new Error(`Invalid response size from ${url}`);
   return bytes;
+}
+
+async function responseBodyWithTimeout(response: Response, url: URL, timeoutMs: number): Promise<ArrayBuffer> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.arrayBuffer(),
+      new Promise<ArrayBuffer>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(`Response body timeout from ${url}`)), timeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    void response.body?.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
 }
 
 async function ensureDiscoverySources(): Promise<Record<"yolo_japan" | "talentio" | "engage", string>> {
@@ -356,9 +484,20 @@ async function observationKeys(sourceFamily: string): Promise<Set<string>> {
   return new Set(result.rows.map((row) => row.observation_key));
 }
 
+async function retentionDetailUrlHashes(): Promise<Set<string>> {
+  const result = await sql<{ normalized_detail_url_hash: string }>`SELECT normalized_detail_url_hash
+    FROM job_retention_tombstones`.execute(db);
+  return new Set(result.rows.map((row) => row.normalized_detail_url_hash));
+}
+
+function detailUrlHash(rawUrl: string): string {
+  return createHash("sha256").update(normalizeApplicationUrl(rawUrl)).digest("hex");
+}
+
 async function familyValidCount(sourceFamily: string): Promise<number> {
   const result = await sql<{ count: number }>`SELECT count(*)::int count FROM job_discovery_candidates
-    WHERE source_family=${sourceFamily} AND location_state='japan' AND state NOT IN ('rejected','expired') AND (
+    WHERE source_family=${sourceFamily} AND location_state='japan' AND state NOT IN ('rejected','expired')
+      AND publication_freshness='recent' AND (
       (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
         AND last_authoritative_seen_at>=now()-interval '72 hours')
       OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=now()-interval '30 days'))`.execute(db);
@@ -368,7 +507,7 @@ async function familyValidCount(sourceFamily: string): Promise<number> {
 async function sourceFamilyDistribution(): Promise<Array<{ sourceFamily: string; valid: number; share: number }>> {
   const result = await sql<{ sourceFamily: string; valid: number; share: number }>`WITH counts AS (
       SELECT source_family,count(*)::int valid FROM job_discovery_candidates
-      WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND (
+      WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND publication_freshness='recent' AND (
         (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
           AND last_authoritative_seen_at>=now()-interval '72 hours')
         OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=now()-interval '30 days'))
@@ -384,7 +523,9 @@ function maybeGunzip(value: Uint8Array): Uint8Array {
 }
 
 function progress(family: string, current: number, target: number, fetchedPages: number): void {
-  if (current % 50 === 0 || current >= target) process.stdout.write(`${family} ${current}/${target} fetched=${fetchedPages}\n`);
+  if ((current > 0 && current % 50 === 0) || current >= target) {
+    process.stdout.write(`${family} ${current}/${target} fetched=${fetchedPages}\n`);
+  }
 }
 
 function progressError(family: string, url: string, error: unknown): void {
@@ -404,4 +545,19 @@ function required(name: string): string {
 }
 
 function delay(milliseconds: number): Promise<void> { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
+async function mapWithConcurrency<T>(
+  values: readonly T[],
+  concurrency: number,
+  task: (value: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const worker = async (): Promise<void> => {
+    while (nextIndex < values.length) {
+      const value = values[nextIndex];
+      nextIndex += 1;
+      if (value !== undefined) await task(value);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, worker));
+}
 function sha256(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }

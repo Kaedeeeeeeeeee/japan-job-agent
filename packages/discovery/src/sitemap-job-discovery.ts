@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { load } from "cheerio";
 import type { JobDateValue, JobDiscoveryLead } from "../../contracts/src/index.js";
 import { DeterministicJobParser, type ParsedJob } from "../../parser/src/deterministic-job-parser.js";
+import { parsePublishedDateValue } from "../../freshness/src/job-freshness.js";
 
 export interface SitemapEntry {
   url: string;
@@ -283,10 +284,7 @@ function talentioHomeUrl($: ReturnType<typeof load>, tenantKey: string): string 
 }
 
 function dateValue(raw: string | undefined): JobDateValue | undefined {
-  if (raw === undefined || raw.trim() === "") return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { value: raw, precision: "date" };
-  const timestamp = Date.parse(raw);
-  return Number.isFinite(timestamp) ? { value: new Date(timestamp).toISOString(), precision: "datetime" } : undefined;
+  return raw === undefined ? undefined : parsePublishedDateValue(raw);
 }
 
 function array(value: unknown): unknown[] { return Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]; }

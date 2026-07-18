@@ -29,5 +29,59 @@
     "kind": "ashby",
     "tenantKey": "cursor",
     "companyName": "Cursor"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "sonyglobal.wd1.myworkdayjobs.com/SonyJapanCareers",
+    "companyName": "Sony Group Corporation",
+    "officialReferrerUrl": "https://www.sony.com/en/SonyInfo/Careers/japan/"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "boeing.wd1.myworkdayjobs.com/EXTERNAL_CAREERS",
+    "companyName": "Boeing",
+    "officialReferrerUrl": "https://jobs.boeing.com/search-jobs/Japan/185/2/1"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "msd.wd5.myworkdayjobs.com/SearchJobs",
+    "companyName": "MSD",
+    "officialReferrerUrl": "https://jobs.msd.com/gb/en/search-results?keywords=Japan"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "fourseasons.wd3.myworkdayjobs.com/search",
+    "companyName": "Four Seasons",
+    "officialReferrerUrl": "https://careers.fourseasons.com/us/en/search-results?keywords=Japan"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "workday.wd5.myworkdayjobs.com/Workday",
+    "companyName": "Workday"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "hp.wd5.myworkdayjobs.com/externalcareersite",
+    "companyName": "HP"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "regeneron.wd1.myworkdayjobs.com/Careers",
+    "companyName": "Regeneron"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "workiva.wd503.myworkdayjobs.com/careers",
+    "companyName": "Workiva"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "aveva.wd3.myworkdayjobs.com/aveva_careers",
+    "companyName": "AVEVA"
+  },
+  {
+    "kind": "workday",
+    "tenantKey": "cw.wd1.myworkdayjobs.com/External",
+    "companyName": "Cushman & Wakefield"
   }
 ]

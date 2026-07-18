@@ -9,11 +9,14 @@ const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl === undefined) throw new Error("DATABASE_URL is required");
 const limit = Number(process.argv[2] ?? 1_000);
 if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new Error("limit must be an integer from 1 to 10000");
+const sourceKinds = (process.env.EXTRACT_SOURCE_KINDS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
 const { Pool } = pg;
 const pool = new Pool({ connectionString: databaseUrl });
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool }) });
 try {
   const parser = new DeterministicJobParser();
+  const sourceFilter = sourceKinds.length === 0 ? sql``
+    : sql`AND s.source_kind::text IN (${sql.join(sourceKinds.map((kind) => sql`${kind}`))})`;
   const pending = await sql<{ id: string; source_instance_id: string }>`SELECT v.id, s.id AS source_instance_id FROM source_job_versions v
     JOIN source_job_records r ON r.id=v.source_job_record_id
     JOIN source_instances s ON s.id=r.source_instance_id
@@ -24,7 +27,7 @@ try {
       SELECT 1 FROM source_job_extractions e WHERE e.source_job_version_id=v.id
       AND e.parser_key=${parser.parserKey} AND e.parser_version=${parser.parserVersion}
       AND e.schema_version=${parser.schemaVersion}
-    ) ORDER BY v.fetched_at LIMIT ${limit}`.execute(db);
+    ) ${sourceFilter} ORDER BY v.fetched_at LIMIT ${limit}`.execute(db);
   const service = new ExtractionService(db, createObjectStore());
   let succeeded = 0;
   let failed = 0;
@@ -44,7 +47,8 @@ try {
       process.stderr.write(`extraction failed for ${row.id}: ${detail}\n`);
     }
   }
-  process.stdout.write(`${JSON.stringify({ parserVersion: parser.parserVersion, selected: pending.rows.length, succeeded, failed, evidence })}\n`);
+  process.stdout.write(`${JSON.stringify({ parserVersion: parser.parserVersion, sourceKinds,
+    selected: pending.rows.length, succeeded, failed, evidence })}\n`);
 } finally {
   await db.destroy();
 }

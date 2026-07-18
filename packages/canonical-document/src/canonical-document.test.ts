@@ -43,6 +43,24 @@ describe("Canonical Document adapters", () => {
     expect(document.sections.find((section) => section.kind === "location")?.locator.kind).toBe("json_path");
   });
 
+  it("maps Greenhouse first_published separately from updated_at", () => {
+    const document = build(JSON.stringify({ title: "Backend Engineer", location: { name: "Tokyo" },
+      content: "Build reliable products in Japan.", first_published: "2026-07-01T12:34:56Z",
+      updated_at: "2026-07-12T01:02:03Z", application_deadline: "2026-08-31T23:59:59Z" }), "greenhouse");
+    expect(document.sections.filter((section) => section.kind === "dates").map((section) => section.heading))
+      .toEqual(expect.arrayContaining(["first_published", "updated_at", "application_deadline"]));
+  });
+
+  it("reads semantic publication dates from generic official HTML", () => {
+    const document = build(`<html><head><title>Backend Engineer</title></head><body><main>
+      <h1>Backend Engineer</h1><p>Official engineering role based in Tokyo, Japan.</p>
+      <span itemprop="datePosted" content="2026-07-08"></span>
+      <p>Posted <time datetime="2026-07-09T10:00:00+09:00">July 9</time></p>
+    </main></body></html>`);
+    expect(document.sections.some((section) => section.kind === "dates"
+      && section.text.includes("datePosted: 2026-07-08"))).toBe(true);
+  });
+
   it("does not classify a company-information address as the workplace", () => {
     const document = build(`<html><body><main><h1>営業職</h1>
       <section><h2>仕事内容</h2><p>法人営業を担当します。</p></section>

@@ -8,3 +8,4 @@ Type=oneshot
 WorkingDirectory=/opt/japan-job-agent
 TimeoutStartSec=2h
 ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:public-ats
+ExecStart=/usr/bin/docker compose --env-file deploy/linux/.env -f deploy/linux/compose.yml run --rm worker pnpm discovery:wantedly

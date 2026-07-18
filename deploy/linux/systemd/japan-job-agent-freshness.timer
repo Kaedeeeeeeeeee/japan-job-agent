@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Japan Job Agent publication freshness timer
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

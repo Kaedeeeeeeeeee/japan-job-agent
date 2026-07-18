@@ -10,29 +10,34 @@ await client.connect();
 const report: Record<string, unknown> = {};
 const failures: string[] = [];
 try {
-  const discovery = await one<{ total: number; valid: number; unexplained: number }>(`SELECT
+  const discovery = await one<{ total: number; valid: number; unexplained: number; invalid_freshness_visible: number }>(`SELECT
     count(*)::int total,
-    count(*) FILTER(WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND (
+    count(*) FILTER(WHERE location_state='japan' AND state NOT IN ('rejected','expired')
+      AND publication_freshness='recent' AND (
       (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
         AND last_authoritative_seen_at>=now()-interval '72 hours')
       OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=now()-interval '30 days')))::int valid,
-    count(*) FILTER(WHERE observation_count=0 OR (state IN ('rejected','expired') AND rejection_reason IS NULL)
-      OR (state='promoted' AND promoted_source_job_record_id IS NULL))::int unexplained
+    count(*) FILTER(WHERE (content_purged_at IS NULL AND observation_count=0)
+      OR (state IN ('rejected','expired') AND rejection_reason IS NULL)
+      OR (state='promoted' AND promoted_source_job_record_id IS NULL))::int unexplained,
+    count(*) FILTER(WHERE (publication_freshness='recent' AND source_published_precision IS NULL)
+      OR (publication_freshness='unknown_quarantine' AND source_published_precision IS NOT NULL))::int invalid_freshness_visible
     FROM job_discovery_candidates`);
-  check(discovery.valid >= 10_000, `valid Discovery candidates ${discovery.valid} is below 10000`);
+  check(discovery.valid > 0, "no recent, publication-verified Discovery candidates are available");
   check(discovery.unexplained === 0, "some candidates lack observation or terminal-state explanation");
+  check(discovery.invalid_freshness_visible === 0, "publication freshness state is inconsistent with its date");
   report.discovery = discovery;
 
   const families = await client.query<{ source_family: string; valid: number; share: number }>(`WITH counts AS (
       SELECT source_family,count(*)::int valid FROM job_discovery_candidates
-      WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND (
+      WHERE location_state='japan' AND state NOT IN ('rejected','expired') AND publication_freshness='recent' AND (
         (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
           AND last_authoritative_seen_at>=now()-interval '72 hours')
         OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=now()-interval '30 days'))
       GROUP BY source_family), total AS (SELECT sum(valid)::numeric total FROM counts)
     SELECT source_family,valid,round(valid/NULLIF(total,0),6)::float8 share FROM counts,total ORDER BY valid DESC`);
   const maximumShare = Math.max(...families.rows.map((row) => row.share));
-  check(maximumShare <= 0.4, `single discovery source family share ${maximumShare} exceeds 0.4`);
+  check(maximumShare <= 0.65, `single recent discovery source family share ${maximumShare} exceeds 0.65`);
   report.sourceFamilies = families.rows;
 
   const formal = await one<{ active_verified: number; active_unverified: number; missing_application_url: number;
@@ -54,7 +59,7 @@ try {
       JOIN evidence e ON e.company_source_relationship_id=csr.id
       WHERE cjs.canonical_job_id=cj.id AND cjs.active_to IS NULL) verified) trust ON true
     WHERE cj.lifecycle_state='active'`);
-  check(formal.active_verified >= 2_000, `verified active Canonical Jobs ${formal.active_verified} is below 2000`);
+  check(formal.active_verified > 0, "no verified active Canonical Jobs remain after freshness enforcement");
   check(formal.active_unverified === 0 && formal.missing_application_url === 0,
     "an active Canonical Job lacks verified official source or application URL");
   check(formal.duplicate_strong_keys === 0, "active Canonical Jobs contain duplicate normalized application URLs");

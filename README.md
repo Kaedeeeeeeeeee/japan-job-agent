@@ -109,7 +109,29 @@ Greenhouse schedules run every 12 hours; schema.org records every 24 hours. Acti
 
 ## 10,000-job source expansion
 
-Discovery directories are isolated from recommendation-eligible jobs. JETRO OFP entries create auditable company candidates and company-level foreign-talent signals; they cannot create job records or be promoted to job-level visa facts.
+The 10,000-job corpus was a source-expansion milestone, not a permanent inventory target. The current [freshness-first policy](./docs/spec/v0.3-freshness-first.md) searches new postings daily and retains full job content only when an explicit publication date is within six calendar months. Unknown dates remain invisible for a seven-day enrichment quarantine; observation time and source update time are never presented as publication time.
+
+```bash
+# Read-only impact report, then bounded/idempotent enforcement.
+DATABASE_URL=... pnpm freshness:dry-run
+DATABASE_URL=... RAW_STORAGE_PATH=.data pnpm freshness:apply
+```
+
+For a bounded catch-up, set an explicit publication lookback. This mode admits only jobs with a trustworthy
+publication date inside the window; unknown dates, future dates, and older jobs are reported but not written.
+
+```bash
+DATABASE_URL=... DISCOVERY_BACKFILL_DAYS=30 pnpm discovery:sitemaps
+DATABASE_URL=... DISCOVERY_BACKFILL_DAYS=30 pnpm discovery:public-ats
+DATABASE_URL=... DISCOVERY_BACKFILL_DAYS=30 pnpm discovery:wantedly
+```
+
+Discovery directories remain isolated from recommendation-eligible jobs. JETRO OFP entries create auditable company candidates and company-level foreign-talent signals; they cannot create job records or be promoted to job-level visa facts.
+
+Wantedly is metadata-only Discovery. Each run rechecks `robots.txt` and stops if the curated JETRO-linked
+`/companies/{tenant}/projects` path is no longer allowed. It stores only stable project IDs, titles, locations,
+exact `published_at` values, and public URLs; it does not log in, collect member/candidate data, store full
+descriptions, train AI, or formalize Wantedly content for recommendations without a separate policy review.
 
 ```bash
 DATABASE_URL=... pnpm discovery:jetro-ofp
@@ -122,4 +144,4 @@ DATABASE_URL=... pnpm corpus:report
 DATABASE_URL=... pnpm sync:hrmos -- verified-tenant-key
 ```
 
-HRMOS, HERP, Jobcan, AirWork, engage, and Talentio are complete-collection connectors: they fetch every detail body before the Orchestrator may finalize an authoritative snapshot. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. Global Greenhouse boards retain complete snapshots while explicit overseas locations are deterministically excluded from recommendations. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md), [JETRO promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md), and [expanded corpus report](./docs/delivery/job-corpus-expansion-2026-07-14.md).
+HRMOS, HERP, Jobcan, AirWork, engage, Talentio, and Workday are complete-collection connectors: they fetch every relevant detail body before the Orchestrator may finalize an authoritative snapshot. Workday discovery uses the public CXS careers endpoint with a Japan query, then reads each Japan detail record for the exact `startDate`; relative labels such as “Posted 30+ Days Ago” are never used as publication dates. JETRO candidates pass through bounded detail, entrypoint, and job-link audits before promotion. Every company receives a terminal audit state; unsupported or unstructured pages never fabricate jobs. Global Greenhouse boards retain complete snapshots while explicit overseas locations are deterministically excluded from recommendations. IT, e-commerce, IT consulting, and HR operations are prioritized in the discovery queue while all lawful sectors, including Specified Skilled Worker routes, remain in scope. See the [source expansion design](./docs/plans/2026-07-13-source-expansion-design.md), [JETRO promotion report](./docs/delivery/jetro-ofp-promotion-2026-07-14.md), and [expanded corpus report](./docs/delivery/job-corpus-expansion-2026-07-14.md).

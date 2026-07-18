@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { SourceJobVersion } from "../../contracts/src/index.js";
-import { DeterministicJobParser } from "./deterministic-job-parser.js";
+import { DeterministicJobParser, type ParsedJob } from "./deterministic-job-parser.js";
 
 function version(payload: string): SourceJobVersion {
   return {
@@ -91,6 +91,20 @@ describe("DeterministicJobParser", () => {
     expect(result.evidence.some((item) => item.fieldPath === "jobDates.published")).toBe(true);
   });
 
+  it("parses an explicit Japanese publication date from visible job metadata", async () => {
+    const result = await new DeterministicJobParser().parse(version(`<html><body><main>
+      <h1>バックエンドエンジニア</h1>
+      <section><h2>掲載日</h2><p>掲載開始日：2026年7月7日</p></section>
+      <section><h2>勤務地</h2><p>東京都</p></section>
+      <section><h2>雇用形態</h2><p>正社員</p></section>
+    </main></body></html>`), context);
+    expect(result.status).toBe("succeeded");
+    expect((result.structured as ParsedJob).jobDates.published).toEqual({
+      state: "known",
+      values: [{ value: "2026-07-07", precision: "date" }],
+    });
+  });
+
   it("keeps invalid dates unknown and reports conflicting source publication dates", async () => {
     const conflicting = await new DeterministicJobParser().parse(version(JSON.stringify({
       title: "Product Engineer",
@@ -143,6 +157,25 @@ describe("DeterministicJobParser", () => {
       locations: { state: "known", values: expect.arrayContaining([expect.objectContaining({ countryCode: "JP" })]) },
       employmentTypes: { state: "known" },
       jobDates: { published: { state: "known", values: [{ value: "2026-07-14T08:29:20.852Z" }] } },
+    });
+  });
+
+  it("uses Greenhouse first_published and keeps updated_at as source update time", async () => {
+    const result = await new DeterministicJobParser().parse(version(JSON.stringify({
+      id: 123,
+      title: "Platform Engineer",
+      absolute_url: "https://job-boards.greenhouse.io/example/jobs/123",
+      location: { name: "Tokyo, Japan" },
+      content: "Full-time platform engineering role in Tokyo.",
+      first_published: "2026-07-01T12:34:56Z",
+      updated_at: "2026-07-12T01:02:03Z",
+      application_deadline: "2026-08-31T23:59:59Z",
+    })), context);
+    expect(result.status).toBe("succeeded");
+    expect((result.structured as ParsedJob).jobDates).toEqual({
+      published: { state: "known", values: [{ value: "2026-07-01T12:34:56.000Z", precision: "datetime" }] },
+      sourceUpdated: { state: "known", values: [{ value: "2026-07-12T01:02:03.000Z", precision: "datetime" }] },
+      validThrough: { state: "known", values: [{ value: "2026-08-31T23:59:59.000Z", precision: "datetime" }] },
     });
   });
 

@@ -9,9 +9,17 @@ import type {
 import { jobDiscoveryLeadSchema } from "../../contracts/src/index.js";
 import { normalizeApplicationUrl } from "../../canonical/src/normalize-application-url.js";
 import type { OutboxDatabase } from "../../db/src/outbox.js";
+import {
+  addCalendarMonths,
+  evaluatePublicationFreshness,
+  tokyoCalendarDate,
+  type PublicationDecision,
+  type PublicationFreshness,
+} from "../../freshness/src/job-freshness.js";
 
 interface CandidateRow {
   id: string;
+  discovery_source_id: string;
   state: "discovered" | "resolving" | "resolved" | "promoted" | "rejected" | "expired";
   origin_kind: JobDiscoveryLead["originKind"];
   source_family: string;
@@ -34,6 +42,15 @@ interface CandidateRow {
   last_seen_at: Date;
   last_authoritative_seen_at: Date | null;
   last_authoritative_import_run_id: string | null;
+  source_published_date: string | Date | null;
+  source_published_at: Date | null;
+  source_published_precision: "date" | "datetime" | null;
+  publication_freshness: PublicationFreshness;
+  publication_check_due_at: Date | null;
+  retention_expires_on: string | null;
+  identity_fingerprint: string;
+  normalized_detail_url_hash: string;
+  content_purged_at: Date | null;
   resolved_source_instance_id: string | null;
   promoted_source_job_record_id: string | null;
   rejection_reason: string | null;
@@ -57,6 +74,7 @@ export interface IngestJobLeadResult {
   candidateCreated: boolean;
   observationCreated: boolean;
   countable: boolean;
+  disposition: "admitted" | "quarantined" | "tombstoned";
 }
 
 export interface FinalizedAuthoritativeImportInput {
@@ -87,6 +105,10 @@ export interface DiscoverySummary {
   nonJapan: number;
   unknownLocation: number;
   publishedKnown: number;
+  recent: number;
+  unknownQuarantine: number;
+  retentionExpired: number;
+  purged: number;
 }
 
 export class JobDiscoveryService {
@@ -122,10 +144,12 @@ export class JobDiscoveryService {
     const locationState = classifyJapanLocation(lead.locationText);
     const observedAt = new Date(lead.observedAt);
     const lockKey = strongKey(lead, normalizedDetailUrl, normalizedOfficialUrl);
+    const identityFingerprint = sha256(lockKey);
+    const normalizedDetailUrlHash = sha256(normalizedDetailUrl);
 
     return this.db.transaction().execute(async (trx) => {
       await sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`.execute(trx);
-      const authoritativeRunId = lead.authoritative
+      const incomingAuthoritativeRunId = lead.authoritative
         ? await validatedAuthoritativeRun(trx, lead.discoveryImportRunId, lead.discoverySourceId)
         : null;
       const existing = await sql<CandidateRow>`SELECT * FROM job_discovery_candidates
@@ -135,15 +159,56 @@ export class JobDiscoveryService {
             AND source_family=${lead.sourceFamily} AND tenant_key=${lead.tenantKey ?? null}
             AND external_posting_id=${lead.externalPostingId ?? null})
         ORDER BY created_at, id LIMIT 1 FOR UPDATE`.execute(trx);
-      const candidateId = existing.rows[0]?.id ?? randomUUID();
+      const existingRow = existing.rows[0];
+      const published = publishedFromCandidate(existingRow) ?? lead.published;
+      const publication = evaluatePublicationFreshness(published, existingRow?.first_seen_at ?? observedAt, observedAt);
+      const tombstone = await sql<{ id: string }>`SELECT id FROM job_retention_tombstones
+        WHERE identity_fingerprint=${identityFingerprint} OR normalized_detail_url_hash=${normalizedDetailUrlHash}
+        ORDER BY created_at,id LIMIT 1 FOR UPDATE`.execute(trx);
+      if (tombstone.rows[0] !== undefined) {
+        await sql`UPDATE job_retention_tombstones SET last_seen_at=GREATEST(last_seen_at,${lead.observedAt}::timestamptz),
+          updated_at=now() WHERE id=${tombstone.rows[0].id}::uuid`.execute(trx);
+        return { candidateId: tombstone.rows[0].id, candidateCreated: false, observationCreated: false,
+          countable: false, disposition: "tombstoned" };
+      }
+      if (publication.freshness === "expired") {
+        const tombstoneId = await upsertRetentionTombstone(trx, {
+          lead, identityFingerprint, normalizedDetailUrlHash, publication,
+        });
+        if (existingRow !== undefined) {
+          await sql`UPDATE job_discovery_candidates SET state='expired',publication_freshness='expired',
+            publication_check_due_at=NULL,retention_expires_on=${retentionExpiresOn(publication)}::date,
+            rejection_reason=${publication.reason},updated_at=now() WHERE id=${existingRow.id}::uuid`.execute(trx);
+        }
+        return { candidateId: existingRow?.id ?? tombstoneId, candidateCreated: false, observationCreated: false,
+          countable: false, disposition: "tombstoned" };
+      }
+      const candidateId = existingRow?.id ?? randomUUID();
       const candidateCreated = existing.rows[0] === undefined;
+      let authoritativeRunId = incomingAuthoritativeRunId;
+      if (existingRow !== undefined && incomingAuthoritativeRunId !== null
+        && existingRow.discovery_source_id !== lead.discoverySourceId) {
+        if (shouldAdoptIncomingSource(existingRow, lead)) {
+          await sql`UPDATE job_discovery_candidates SET discovery_source_id=${lead.discoverySourceId}::uuid,
+            origin_kind=${lead.originKind}::job_discovery_origin_kind,last_authoritative_seen_at=NULL,
+            last_authoritative_import_run_id=NULL,updated_at=now() WHERE id=${candidateId}::uuid`.execute(trx);
+          existingRow.discovery_source_id = lead.discoverySourceId;
+          existingRow.origin_kind = lead.originKind;
+          existingRow.last_authoritative_seen_at = null;
+          existingRow.last_authoritative_import_run_id = null;
+        } else {
+          authoritativeRunId = null;
+        }
+      }
       if (candidateCreated) {
         await sql`INSERT INTO job_discovery_candidates(
             id,discovery_source_id,origin_kind,source_family,source_kind_hint,tenant_key,external_posting_id,
             external_key,detail_url,normalized_detail_url,official_url,normalized_official_url,
             company_name,normalized_company_name,title,location_text,location_state,priority,
             first_seen_at,last_seen_at,last_authoritative_seen_at,last_authoritative_import_run_id,
-            source_published_date,source_published_at,source_published_precision
+            source_published_date,source_published_at,source_published_precision,
+            publication_freshness,publication_check_due_at,retention_expires_on,
+            identity_fingerprint,normalized_detail_url_hash
           ) VALUES (
             ${candidateId}::uuid,${lead.discoverySourceId}::uuid,${lead.originKind}::job_discovery_origin_kind,
             ${lead.sourceFamily},${lead.sourceKindHint ?? null}::source_kind,${lead.tenantKey ?? null},
@@ -154,7 +219,9 @@ export class JobDiscoveryService {
             NULL,NULL,
             ${lead.published?.precision === "date" ? lead.published.value : null}::date,
             ${lead.published?.precision === "datetime" ? lead.published.value : null}::timestamptz,
-            ${lead.published?.precision ?? null}::job_date_precision
+            ${lead.published?.precision ?? null}::job_date_precision,
+            ${publication.freshness}::job_publication_freshness,${publication.quarantineUntil}::timestamptz,
+            ${retentionExpiresOn(publication)}::date,${identityFingerprint},${normalizedDetailUrlHash}
           )`.execute(trx);
       } else {
         const row = existing.rows[0]!;
@@ -175,6 +242,9 @@ export class JobDiscoveryService {
           source_published_date=COALESCE(source_published_date,${lead.published?.precision === "date" ? lead.published.value : null}::date),
           source_published_at=COALESCE(source_published_at,${lead.published?.precision === "datetime" ? lead.published.value : null}::timestamptz),
           source_published_precision=COALESCE(source_published_precision,${lead.published?.precision ?? null}::job_date_precision),
+          publication_freshness=${publication.freshness}::job_publication_freshness,
+          publication_check_due_at=${publication.quarantineUntil}::timestamptz,
+          retention_expires_on=${retentionExpiresOn(publication)}::date,
           updated_at=now()
           WHERE id=${candidateId}::uuid`.execute(trx);
       }
@@ -210,7 +280,8 @@ export class JobDiscoveryService {
           WHERE id=${candidateId}::uuid`.execute(trx);
       }
       const current = await this.loadCandidate(candidateId, trx);
-      return { candidateId, candidateCreated, observationCreated, countable: isCountableCandidate(current, observedAt) };
+      return { candidateId, candidateCreated, observationCreated, countable: isCountableCandidate(current, observedAt),
+        disposition: publication.freshness === "recent" ? "admitted" : "quarantined" };
     });
   }
 
@@ -269,6 +340,11 @@ export class JobDiscoveryService {
     }
     const normalizedOfficialUrl = normalizeApplicationUrl(resolution.officialUrl);
     return this.db.transaction().execute(async (trx) => {
+      const freshness = await sql<{ publication_freshness: PublicationFreshness }>`SELECT publication_freshness
+        FROM job_discovery_candidates WHERE id=${candidateId}::uuid FOR UPDATE`.execute(trx);
+      if (freshness.rows[0]?.publication_freshness !== "recent") {
+        throw new Error("Candidate publication date must be within the retention window before resolution");
+      }
       const verified = await sql<{ evidence_count: number }>`SELECT count(DISTINCT e.id)::int evidence_count
         FROM source_instances s
         JOIN company_source_relationships csr ON csr.source_instance_id=s.id
@@ -291,7 +367,8 @@ export class JobDiscoveryService {
       await sql`UPDATE job_discovery_candidates SET state='resolved',official_url=${resolution.officialUrl},
         normalized_official_url=${normalizedOfficialUrl},resolved_source_instance_id=${resolution.sourceInstanceId}::uuid,
         rejection_reason=NULL,updated_at=now()
-        WHERE id=${candidateId}::uuid AND state IN ('discovered','resolving','resolved')`.execute(trx);
+        WHERE id=${candidateId}::uuid AND publication_freshness='recent'
+          AND state IN ('discovered','resolving','resolved')`.execute(trx);
       for (const evidenceId of resolution.evidenceIds) {
         await sql`INSERT INTO job_discovery_resolution_evidence(candidate_id,evidence_id)
           VALUES (${candidateId}::uuid,${evidenceId}::uuid) ON CONFLICT DO NOTHING`.execute(trx);
@@ -305,6 +382,7 @@ export class JobDiscoveryService {
     const inserted = await sql<{ id: string }>`INSERT INTO job_promotion_attempts(id,candidate_id,idempotency_key,available_at)
       SELECT ${attemptId}::uuid,id,${idempotencyKey},${availableAt.toISOString()}::timestamptz
       FROM job_discovery_candidates WHERE id=${candidateId}::uuid AND state='resolved'
+        AND publication_freshness='recent'
       ON CONFLICT(candidate_id,idempotency_key) DO NOTHING RETURNING id`.execute(this.db);
     if (inserted.rows[0] !== undefined) return inserted.rows[0].id;
     const existing = await sql<{ id: string }>`SELECT id FROM job_promotion_attempts
@@ -324,7 +402,7 @@ export class JobDiscoveryService {
         WHERE (
           (a.state IN ('pending','retryable_failed') AND a.available_at<=now())
           OR (a.state='leased' AND a.lease_expires_at<now())
-        ) AND c.state='resolved' AND c.priority='p0'
+        ) AND c.state='resolved' AND c.publication_freshness='recent' AND c.priority='p0'
         ORDER BY a.available_at,a.created_at,a.id LIMIT ${technologyQuota}
         FOR UPDATE OF a SKIP LOCKED
       ), consult_hr AS MATERIALIZED (
@@ -332,7 +410,7 @@ export class JobDiscoveryService {
         JOIN job_discovery_candidates c ON c.id=a.candidate_id
         WHERE ((a.state IN ('pending','retryable_failed') AND a.available_at<=now())
           OR (a.state='leased' AND a.lease_expires_at<now()))
-          AND c.state='resolved' AND c.priority='p1'
+          AND c.state='resolved' AND c.publication_freshness='recent' AND c.priority='p1'
         ORDER BY a.available_at,a.created_at,a.id LIMIT ${consultHrQuota}
         FOR UPDATE OF a SKIP LOCKED
       ), other_industries AS MATERIALIZED (
@@ -340,7 +418,7 @@ export class JobDiscoveryService {
         JOIN job_discovery_candidates c ON c.id=a.candidate_id
         WHERE ((a.state IN ('pending','retryable_failed') AND a.available_at<=now())
           OR (a.state='leased' AND a.lease_expires_at<now()))
-          AND c.state='resolved' AND c.priority IN ('p2','p3')
+          AND c.state='resolved' AND c.publication_freshness='recent' AND c.priority IN ('p2','p3')
         ORDER BY a.available_at,a.created_at,a.id LIMIT ${otherQuota}
         FOR UPDATE OF a SKIP LOCKED
       ), reserved AS MATERIALIZED (
@@ -350,6 +428,7 @@ export class JobDiscoveryService {
         JOIN job_discovery_candidates c ON c.id=a.candidate_id
         WHERE ((a.state IN ('pending','retryable_failed') AND a.available_at<=now())
           OR (a.state='leased' AND a.lease_expires_at<now())) AND c.state='resolved'
+          AND c.publication_freshness='recent'
           AND NOT EXISTS(SELECT 1 FROM reserved WHERE reserved.id=a.id)
         ORDER BY a.available_at,a.created_at,a.id
         LIMIT GREATEST(0,${safeLimit}-(SELECT count(*) FROM reserved))
@@ -376,6 +455,7 @@ export class JobDiscoveryService {
         attempt_count=attempt.attempt_count+1,updated_at=now()
       FROM job_discovery_candidates candidate
       WHERE attempt.id=${attemptId}::uuid AND candidate.id=attempt.candidate_id AND candidate.state='resolved'
+        AND candidate.publication_freshness='recent'
         AND ((attempt.state IN ('pending','retryable_failed') AND attempt.available_at<=now())
           OR (attempt.state='leased' AND attempt.lease_expires_at<now()))
       RETURNING attempt.id,attempt.candidate_id,attempt.idempotency_key,attempt.state,attempt.available_at,
@@ -411,6 +491,7 @@ export class JobDiscoveryService {
       const valid = await sql<{ candidate_id: string }>`SELECT a.candidate_id
         FROM job_promotion_attempts a
         JOIN job_discovery_candidates c ON c.id=a.candidate_id AND c.state='resolved'
+          AND c.publication_freshness='recent'
         JOIN source_job_records r ON r.id=${sourceJobRecordId}::uuid
           AND r.source_instance_id=c.resolved_source_instance_id AND r.lifecycle_state='active'
         JOIN source_instances s ON s.id=r.source_instance_id AND s.verification_state='verified'
@@ -449,7 +530,7 @@ export class JobDiscoveryService {
         (origin_kind='official_collection' AND last_authoritative_import_run_id IS NOT NULL
           AND last_authoritative_seen_at>=${officialCutoff}::timestamptz)
         OR (origin_kind<>'official_collection' AND observation_count>=2 AND last_seen_at>=${leadCutoff}::timestamptz)
-      ))::int valid,
+      ) AND publication_freshness='recent')::int valid,
       count(*) FILTER (WHERE state='discovered')::int discovered,
       count(*) FILTER (WHERE state='resolving')::int resolving,
       count(*) FILTER (WHERE state='resolved')::int resolved,
@@ -459,11 +540,16 @@ export class JobDiscoveryService {
       count(*) FILTER (WHERE location_state='japan')::int japan,
       count(*) FILTER (WHERE location_state='non_japan')::int "nonJapan",
       count(*) FILTER (WHERE location_state='unknown')::int "unknownLocation",
-      count(*) FILTER (WHERE source_published_precision IS NOT NULL)::int "publishedKnown"
+      count(*) FILTER (WHERE source_published_precision IS NOT NULL)::int "publishedKnown",
+      count(*) FILTER (WHERE publication_freshness='recent')::int recent,
+      count(*) FILTER (WHERE publication_freshness='unknown_quarantine')::int "unknownQuarantine",
+      count(*) FILTER (WHERE publication_freshness='expired')::int "retentionExpired",
+      count(*) FILTER (WHERE content_purged_at IS NOT NULL)::int purged
       FROM job_discovery_candidates`.execute(this.db);
     return result.rows[0] ?? {
       total: 0, valid: 0, discovered: 0, resolving: 0, resolved: 0, promoted: 0,
       rejected: 0, expired: 0, japan: 0, nonJapan: 0, unknownLocation: 0, publishedKnown: 0,
+      recent: 0, unknownQuarantine: 0, retentionExpired: 0, purged: 0,
     };
   }
 
@@ -512,7 +598,8 @@ export function classifyJapanLocation(input: string): JobDiscoveryLocationState 
 }
 
 export function isCountableCandidate(candidate: CandidateRow, now = new Date()): boolean {
-  if (candidate.location_state !== "japan" || candidate.state === "rejected" || candidate.state === "expired") return false;
+  if (candidate.location_state !== "japan" || candidate.state === "rejected" || candidate.state === "expired"
+    || candidate.publication_freshness !== "recent") return false;
   if (candidate.origin_kind === "official_collection") {
     return candidate.last_authoritative_import_run_id !== null && candidate.last_authoritative_seen_at !== null
       && candidate.last_authoritative_seen_at.getTime() >= now.getTime() - 72 * 60 * 60_000;
@@ -536,6 +623,57 @@ function strongKey(lead: JobDiscoveryLead, normalizedDetailUrl: string, normaliz
   return `detail:${normalizedDetailUrl}`;
 }
 
+function publishedFromCandidate(candidate: CandidateRow | undefined): JobDiscoveryLead["published"] {
+  if (candidate?.source_published_precision === "date" && candidate.source_published_date !== null) {
+    return { value: candidate.source_published_date instanceof Date
+      ? tokyoCalendarDate(candidate.source_published_date) : candidate.source_published_date, precision: "date" };
+  }
+  if (candidate?.source_published_precision === "datetime" && candidate.source_published_at !== null) {
+    return { value: candidate.source_published_at.toISOString(), precision: "datetime" };
+  }
+  return undefined;
+}
+
+function retentionExpiresOn(publication: PublicationDecision): string | null {
+  return publication.publicationDate === null ? null : addCalendarMonths(publication.publicationDate, 6);
+}
+
+async function upsertRetentionTombstone(
+  executor: Kysely<OutboxDatabase>,
+  input: {
+    lead: JobDiscoveryLead;
+    identityFingerprint: string;
+    normalizedDetailUrlHash: string;
+    publication: PublicationDecision;
+  },
+): Promise<string> {
+  const inserted = await sql<{ id: string }>`INSERT INTO job_retention_tombstones(
+      identity_fingerprint,normalized_detail_url_hash,source_family,tenant_key,external_posting_id,
+      source_published_date,source_published_at,source_published_precision,reason,last_seen_at
+    ) VALUES (${input.identityFingerprint},${input.normalizedDetailUrlHash},${input.lead.sourceFamily},
+      ${input.lead.tenantKey ?? null},${input.lead.externalPostingId ?? null},
+      ${input.lead.published?.precision === "date" ? input.lead.published.value : null}::date,
+      ${input.lead.published?.precision === "datetime" ? input.lead.published.value : null}::timestamptz,
+      ${input.lead.published?.precision ?? null}::job_date_precision,${input.publication.reason},
+      ${input.lead.observedAt}::timestamptz)
+    ON CONFLICT DO NOTHING RETURNING id`.execute(executor);
+  const id = inserted.rows[0]?.id;
+  if (id !== undefined) return id;
+  const existing = await sql<{ id: string }>`SELECT id FROM job_retention_tombstones
+    WHERE identity_fingerprint=${input.identityFingerprint}
+      OR normalized_detail_url_hash=${input.normalizedDetailUrlHash}
+    ORDER BY created_at,id LIMIT 1 FOR UPDATE`.execute(executor);
+  const existingId = existing.rows[0]?.id;
+  if (existingId === undefined) throw new Error("Retention tombstone could not be persisted");
+  await sql`UPDATE job_retention_tombstones SET last_seen_at=GREATEST(last_seen_at,${input.lead.observedAt}::timestamptz),
+    updated_at=now() WHERE id=${existingId}::uuid`.execute(executor);
+  return existingId;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function normalizeCompanyName(value: string): string {
   return value.normalize("NFKC").toLowerCase().replace(/株式会社|有限会社|合同会社|inc\.?|ltd\.?|corp\.?/gi, "")
     .replace(/[^\p{L}\p{N}]+/gu, "").trim();
@@ -546,13 +684,23 @@ function normalizeWeakText(value: string): string {
 }
 
 function preferOrigin(current: JobDiscoveryLead["originKind"], incoming: JobDiscoveryLead["originKind"]): JobDiscoveryLead["originKind"] {
+  return originPriority(incoming) > originPriority(current) ? incoming : current;
+}
+
+function shouldAdoptIncomingSource(current: CandidateRow, incoming: JobDiscoveryLead): boolean {
+  return originPriority(incoming.originKind) > originPriority(current.origin_kind)
+    || (originPriority(incoming.originKind) === originPriority(current.origin_kind)
+      && current.last_authoritative_import_run_id === null);
+}
+
+function originPriority(value: JobDiscoveryLead["originKind"]): number {
   const priority: Record<JobDiscoveryLead["originKind"], number> = {
     official_collection: 4,
     official_single_record: 3,
     search_index: 2,
     aggregator_lead: 1,
   };
-  return priority[incoming] > priority[current] ? incoming : current;
+  return priority[value];
 }
 
 function promotionView(row: PromotionRow): JobPromotionAttempt {

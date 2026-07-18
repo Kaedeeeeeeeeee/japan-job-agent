@@ -14,6 +14,8 @@ interface GreenhouseJob {
   absolute_url: string;
   location: { name: string };
   updated_at?: string;
+  first_published?: string;
+  application_deadline?: string | null;
   content?: string;
 }
 
@@ -106,8 +108,9 @@ function discoveredJob(
       canonicalUrl: job.absolute_url,
     },
     recordUrl: job.absolute_url,
-    raw: Uint8Array.from(exactRaw ?? new TextEncoder().encode(JSON.stringify(job))),
-    response,
+      raw: Uint8Array.from(exactRaw ?? new TextEncoder().encode(JSON.stringify(job))),
+      response,
+      ...(exactRaw === undefined ? {} : { exactRecordResponse: true }),
   };
 }
 

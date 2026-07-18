@@ -7,10 +7,11 @@ import type {
   SourceKind,
 } from "../../contracts/src/index.js";
 import { collectSnapshot } from "../../domain/src/snapshot-orchestrator.js";
+import { parsePublishedDateValue } from "../../freshness/src/job-freshness.js";
 import { classifyJapanLocation } from "./job-discovery-service.js";
 
 export interface PublicAtsTenantSeed {
-  kind: "smartrecruiters" | "lever" | "ashby";
+  kind: "smartrecruiters" | "lever" | "ashby" | "workday";
   tenantKey: string;
   companyName?: string;
   officialReferrerUrl?: string;
@@ -46,7 +47,19 @@ export async function collectPublicAtsDiscovery(
   const leads: JobDiscoveryLead[] = [];
   let excludedNonJapan = 0;
   let excludedUnknownLocation = 0;
-  for (const job of snapshot.jobs) {
+  for (const listedJob of snapshot.jobs) {
+    const listedValue = parseObject(listedJob.raw);
+    const listedLocation = publicAtsLocation(seed.kind, listedValue);
+    const listedLocationState = classifyJapanLocation(listedLocation);
+    if (listedLocationState === "non_japan") {
+      excludedNonJapan += 1;
+      continue;
+    }
+    if (listedLocationState === "unknown") {
+      excludedUnknownLocation += 1;
+      continue;
+    }
+    const job = seed.kind === "workday" ? await connector.fetchRecord(listedJob.identity, signal) : listedJob;
     const value = parseObject(job.raw);
     const locationText = publicAtsLocation(seed.kind, value);
     const locationState = classifyJapanLocation(locationText);
@@ -95,15 +108,26 @@ export async function collectPublicAtsDiscovery(
 export function publicAtsBaseUrl(kind: PublicAtsTenantSeed["kind"], tenantKey: string): string {
   if (kind === "smartrecruiters") return `https://jobs.smartrecruiters.com/${tenantKey}`;
   if (kind === "lever") return `https://jobs.lever.co/${tenantKey}`;
-  return `https://jobs.ashbyhq.com/${tenantKey}`;
+  if (kind === "ashby") return `https://jobs.ashbyhq.com/${tenantKey}`;
+  const [host, site] = tenantKey.split("/");
+  if (host === undefined || site === undefined || !host.endsWith(".myworkdayjobs.com")) {
+    throw new Error(`Invalid Workday tenant key ${tenantKey}`);
+  }
+  return `https://${host}/en-US/${site}`;
 }
 
 function publicAtsTitle(kind: PublicAtsTenantSeed["kind"], value: Record<string, unknown>): string | null {
-  const candidate = kind === "smartrecruiters" ? value.name : kind === "lever" ? value.text : value.title;
+  const workday = isRecord(value.jobPostingInfo) ? value.jobPostingInfo : {};
+  const candidate = kind === "smartrecruiters" ? value.name : kind === "lever" ? value.text
+    : kind === "workday" ? workday.title : value.title;
   return typeof candidate === "string" && candidate.trim() !== "" ? candidate.trim() : null;
 }
 
 function publicAtsCompany(kind: PublicAtsTenantSeed["kind"], value: Record<string, unknown>): string | null {
+  if (kind === "workday") {
+    const organization = isRecord(value.hiringOrganization) ? value.hiringOrganization : {};
+    return typeof organization.name === "string" && organization.name.trim() !== "" ? organization.name.trim() : null;
+  }
   if (kind !== "smartrecruiters" || !isRecord(value.company)) return null;
   return typeof value.company.name === "string" ? value.company.name : null;
 }
@@ -117,6 +141,11 @@ function publicAtsLocation(kind: PublicAtsTenantSeed["kind"], value: Record<stri
     const categories = isRecord(value.categories) ? value.categories : {};
     return [...stringValues(categories, ["location"]), ...stringArray(categories.allLocations)].join(", ");
   }
+  if (kind === "workday") {
+    const posting = isRecord(value.jobPostingInfo) ? value.jobPostingInfo : value;
+    return [...stringValues(posting, ["location", "locations", "locationsText"]),
+      ...stringArray(posting.additionalLocations)].join(", ");
+  }
   const secondary = Array.isArray(value.secondaryLocations) ? value.secondaryLocations.flatMap((item) => {
     if (!isRecord(item)) return [];
     const address = isRecord(item.address) ? item.address : {};
@@ -127,11 +156,10 @@ function publicAtsLocation(kind: PublicAtsTenantSeed["kind"], value: Record<stri
 }
 
 function publicAtsPublished(kind: PublicAtsTenantSeed["kind"], value: Record<string, unknown>): JobDiscoveryLead["published"] {
-  const raw = kind === "smartrecruiters" ? value.releasedDate : kind === "ashby" ? value.publishedAt : undefined;
-  if (typeof raw !== "string") return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { value: raw, precision: "date" };
-  const timestamp = Date.parse(raw);
-  return Number.isFinite(timestamp) ? { value: new Date(timestamp).toISOString(), precision: "datetime" } : undefined;
+  const workday = isRecord(value.jobPostingInfo) ? value.jobPostingInfo : {};
+  const raw = kind === "smartrecruiters" ? value.releasedDate : kind === "ashby" ? value.publishedAt
+    : kind === "workday" ? workday.startDate : undefined;
+  return typeof raw === "string" ? parsePublishedDateValue(raw) : undefined;
 }
 
 function corpusPriority(title: string, value: Record<string, unknown>): "p0" | "p1" | "p2" | "p3" {
@@ -160,5 +188,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isPublicAtsKind(kind: SourceKind): kind is PublicAtsTenantSeed["kind"] {
-  return kind === "smartrecruiters" || kind === "lever" || kind === "ashby";
+  return kind === "smartrecruiters" || kind === "lever" || kind === "ashby" || kind === "workday";
 }

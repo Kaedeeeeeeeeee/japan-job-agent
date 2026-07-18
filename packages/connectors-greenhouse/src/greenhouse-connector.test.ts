@@ -36,7 +36,7 @@ describe("GreenhouseConnector", () => {
   });
 
   it("keeps the exact record endpoint bytes for immutable raw storage", async () => {
-    const exact = '{ "id": 123, "title": "Software Engineer", "absolute_url": "https://job-boards.greenhouse.io/paypay/jobs/123", "location": { "name": "Tokyo" } }\n';
+    const exact = '{ "id": 123, "title": "Software Engineer", "first_published": "2026-07-01T12:34:56Z", "absolute_url": "https://job-boards.greenhouse.io/paypay/jobs/123", "location": { "name": "Tokyo" } }\n';
     const connector = new GreenhouseConnector(async () => new Response(exact, {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -48,5 +48,6 @@ describe("GreenhouseConnector", () => {
       canonicalUrl: "https://job-boards.greenhouse.io/paypay/jobs/123",
     }, AbortSignal.timeout(1_000));
     expect(new TextDecoder().decode(record.raw)).toBe(exact);
+    expect(record.exactRecordResponse).toBe(true);
   });
 });

@@ -14,6 +14,7 @@ import { ExtractionService } from "../packages/extraction/src/extraction-service
 import { SourceSyncService } from "../packages/ingestion/src/source-sync-service.js";
 import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
 import { DeterministicJobParser } from "../packages/parser/src/deterministic-job-parser.js";
+import { discoveryBackfillWindow } from "../packages/freshness/src/discovery-backfill-window.js";
 import { createObjectStore } from "./object-store-config.js";
 
 interface CandidateRow {
@@ -43,6 +44,7 @@ const databaseUrl = required("DATABASE_URL");
 const targetActiveJobs = positiveInteger(process.env.PROMOTION_ACTIVE_TARGET, 2_000);
 const maximumTenants = positiveInteger(process.env.PROMOTION_MAX_TENANTS, 1_000);
 const hostIntervalMs = Math.max(1_000, positiveInteger(process.env.PROMOTION_HOST_INTERVAL_MS, 1_000));
+const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 const objectStore = createObjectStore();
@@ -63,6 +65,10 @@ try {
     ) metadata ON true
     WHERE c.source_family='talentio' AND c.tenant_key IS NOT NULL
       AND c.location_state='japan' AND c.state IN ('discovered','resolving','resolved','promoted')
+      AND c.publication_freshness='recent'
+      AND (${backfillWindow?.cutoffDate ?? null}::date IS NULL OR
+        COALESCE(c.source_published_date,(c.source_published_at AT TIME ZONE 'Asia/Tokyo')::date)
+          BETWEEN ${backfillWindow?.cutoffDate ?? null}::date AND ${backfillWindow?.today ?? null}::date)
     ORDER BY c.tenant_key,c.id`.execute(db)).rows).slice(0, maximumTenants);
   let activeJobs = await verifiedActiveCanonicalCount();
   let audited = 0;

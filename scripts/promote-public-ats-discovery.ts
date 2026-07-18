@@ -9,6 +9,7 @@ import {
   LeverConnector,
   SmartRecruitersConnector,
 } from "../packages/connectors-public-ats/src/public-ats-connectors.js";
+import { WorkdayConnector } from "../packages/connectors-workday/src/workday-connector.js";
 import type {
   CollectionPage,
   CollectionPageRequest,
@@ -24,6 +25,7 @@ import { ExtractionService } from "../packages/extraction/src/extraction-service
 import { SourceSyncService } from "../packages/ingestion/src/source-sync-service.js";
 import { replaceWithAtomicFile } from "../packages/operations/src/atomic-file.js";
 import { DeterministicJobParser } from "../packages/parser/src/deterministic-job-parser.js";
+import { discoveryBackfillWindow } from "../packages/freshness/src/discovery-backfill-window.js";
 import { createObjectStore } from "./object-store-config.js";
 
 interface CandidateRow {
@@ -41,6 +43,7 @@ interface SeededSource {
 const databaseUrl = required("DATABASE_URL");
 const targetActiveJobs = positiveInteger(process.env.PROMOTION_ACTIVE_TARGET, 2_000);
 const hostIntervalMs = Math.max(1_000, positiveInteger(process.env.PROMOTION_HOST_INTERVAL_MS, 1_000));
+const backfillWindow = discoveryBackfillWindow(process.env.DISCOVERY_BACKFILL_DAYS);
 const { Pool } = pg;
 const db = new Kysely<OutboxDatabase>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: databaseUrl }) }) });
 const objectStore = createObjectStore();
@@ -60,6 +63,10 @@ try {
       FROM job_discovery_candidates WHERE source_family=${seed.kind} AND tenant_key=${seed.tenantKey}
         AND external_posting_id IS NOT NULL AND location_state='japan'
         AND state IN ('discovered','resolving','resolved','promoted')
+        AND publication_freshness='recent'
+        AND (${backfillWindow?.cutoffDate ?? null}::date IS NULL OR
+          COALESCE(source_published_date,(source_published_at AT TIME ZONE 'Asia/Tokyo')::date)
+            BETWEEN ${backfillWindow?.cutoffDate ?? null}::date AND ${backfillWindow?.today ?? null}::date)
       ORDER BY id`.execute(db)).rows;
     if (candidates.length === 0) {
       reports.push({ kind: seed.kind, tenantKey: seed.tenantKey, status: "no_japan_candidates" });
@@ -133,7 +140,9 @@ function candidateSubsetConnector(inner: SourceConnector, allowedIds: ReadonlySe
 
 function connectorFor(kind: PublicAtsTenantSeed["kind"], fetchImplementation: typeof fetch): SourceConnector {
   return kind === "smartrecruiters" ? new SmartRecruitersConnector(fetchImplementation)
-    : kind === "lever" ? new LeverConnector(fetchImplementation) : new AshbyConnector(fetchImplementation);
+    : kind === "lever" ? new LeverConnector(fetchImplementation)
+      : kind === "ashby" ? new AshbyConnector(fetchImplementation)
+        : new WorkdayConnector(fetchImplementation, 8 * 1024 * 1024, "Japan");
 }
 
 async function seedVerifiedRelationship(seed: PublicAtsTenantSeed, fallbackCompanyName: string, corporateUrl: string,
