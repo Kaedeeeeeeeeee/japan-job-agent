@@ -6,6 +6,7 @@ const shared = {
   API_INTERNAL_TOKEN: "a".repeat(32),
   S3_BUCKET: "private-raw",
   BACKUP_BUCKET: "private-backups",
+  BACKUP_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
   S3_ENDPOINT: "https://bucket.railway.app",
   S3_REGION: "asia-southeast1",
   AWS_ACCESS_KEY_ID: "access",
@@ -57,12 +58,18 @@ describe("production service preflight", () => {
       AI_EMBEDDING_MODEL: "embed", AI_EXPLANATION_MODEL: "explain" })).toEqual([]);
   });
 
-  it.each<ProductionService>(["api", "web", "worker", "backup", "temporal"])("accepts local-disk Linux %s configuration", (service) => {
+  it.each<ProductionService>(["api", "web", "worker", "backup", "temporal"])("accepts R2-backed Linux %s configuration", (service) => {
     const linux = { ...shared, DEPLOYMENT_TARGET: "linux", DATABASE_URL: "postgresql://postgres:secret@postgres:5432/jja",
       API_BASE_URL: "http://api:3000", AUTH_URL: "https://jja.example-tailnet.ts.net", RAW_STORAGE_PATH: "/data/raw",
-      BACKUP_OUTPUT_PATH: "/data/backups/jja.dump", TEMPORAL_ADDRESS: "temporal:7233", POSTGRES_SEEDS: "postgres",
-      S3_BUCKET: undefined, BACKUP_BUCKET: undefined, S3_ENDPOINT: undefined, S3_REGION: undefined,
-      AWS_ACCESS_KEY_ID: undefined, AWS_SECRET_ACCESS_KEY: undefined, DBNAME: undefined, VISIBILITY_DBNAME: undefined };
+      BACKUP_OUTPUT_PATH: "/data/backups/jja.dump.enc", TEMPORAL_ADDRESS: "temporal:7233", POSTGRES_SEEDS: "postgres",
+      S3_BUCKET: undefined, DBNAME: undefined, VISIBILITY_DBNAME: undefined };
     expect(validateProductionConfig(service, linux)).toEqual([]);
+  });
+
+  it("requires authenticated encrypted offsite Linux backups", () => {
+    const issues = validateProductionConfig("backup", { ...shared, DEPLOYMENT_TARGET: "linux",
+      DATABASE_URL: "postgresql://postgres:secret@postgres:5432/jja", BACKUP_ENCRYPTION_KEY: "too-short" });
+    expect(issues.map((issue) => issue.variable)).toContain("BACKUP_ENCRYPTION_KEY");
+    expect(JSON.stringify(issues)).not.toContain("too-short");
   });
 });

@@ -28,8 +28,11 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/japan_job_agent_drill_source
-      BACKUP_OUTPUT_PATH: /tmp/japan-job-agent-drill.dump
-      BACKUP_INPUT_PATH: /tmp/japan-job-agent-drill.dump
+      BACKUP_OUTPUT_PATH: /tmp/japan-job-agent-drill.dump.enc
+      BACKUP_INPUT_PATH: /tmp/japan-job-agent-drill.dump.enc
+      # Synthetic drill key; this workflow contains no production data.
+      BACKUP_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      REQUIRE_ENCRYPTED_BACKUP: "true"
       RESTORE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/japan_job_agent_restore_drill
     steps:
       - uses: actions/checkout@v4
@@ -54,5 +57,5 @@ jobs:
         if: failure()
         with:
           name: failed-backup-restore-drill
-          path: /tmp/japan-job-agent-drill.dump
+          path: /tmp/japan-job-agent-drill.dump.enc
           retention-days: 7
