@@ -9,7 +9,7 @@ const requiredByService: Record<ProductionService, string[]> = {
   api: ["DATABASE_URL", "API_INTERNAL_TOKEN", "S3_BUCKET", "S3_ENDPOINT", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
   web: ["API_BASE_URL", "API_INTERNAL_TOKEN", "AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET", "ALLOWED_GITHUB_LOGIN"],
   worker: ["DATABASE_URL", "S3_BUCKET", "S3_ENDPOINT", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "TEMPORAL_ADDRESS"],
-  backup: ["DATABASE_URL", "BACKUP_BUCKET", "S3_ENDPOINT", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
+  backup: ["DATABASE_URL", "BACKUP_ENCRYPTION_KEY", "BACKUP_BUCKET", "S3_ENDPOINT", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
   temporal: ["DB", "POSTGRES_SEEDS", "POSTGRES_USER", "POSTGRES_PWD", "DBNAME", "VISIBILITY_DBNAME"],
 };
 
@@ -17,7 +17,7 @@ const linuxRequiredByService: Record<ProductionService, string[]> = {
   api: ["DATABASE_URL", "API_INTERNAL_TOKEN"],
   web: ["API_BASE_URL", "API_INTERNAL_TOKEN", "AUTH_SECRET", "AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET", "ALLOWED_GITHUB_LOGIN", "AUTH_URL"],
   worker: ["DATABASE_URL", "RAW_STORAGE_PATH", "TEMPORAL_ADDRESS"],
-  backup: ["DATABASE_URL", "BACKUP_OUTPUT_PATH"],
+  backup: ["DATABASE_URL", "BACKUP_OUTPUT_PATH", "BACKUP_ENCRYPTION_KEY", "BACKUP_BUCKET", "S3_ENDPOINT", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
   temporal: ["DB", "POSTGRES_SEEDS", "POSTGRES_USER", "POSTGRES_PWD"],
 };
 
@@ -44,6 +44,13 @@ export function validateProductionConfig(service: ProductionService, env: Readon
   }
   if (["api", "worker", "backup"].includes(service) && !blank(env.S3_ENDPOINT)) {
     checkUrl(issues, "S3_ENDPOINT", env.S3_ENDPOINT ?? "", ["https:"]);
+  }
+  if (service === "backup" && !blank(env.BACKUP_ENCRYPTION_KEY)) {
+    const normalized = env.BACKUP_ENCRYPTION_KEY?.trim() ?? "";
+    const decoded = Buffer.from(normalized, "base64");
+    if (decoded.byteLength !== 32 || decoded.toString("base64") !== normalized) {
+      issues.push({ variable: "BACKUP_ENCRYPTION_KEY", problem: "must be one canonical base64-encoded 32-byte key" });
+    }
   }
   if (["api", "worker"].includes(service) && ["AI_ENRICHMENT_ENABLED", "SEMANTIC_RETRIEVAL_ENABLED", "AI_EXPLANATIONS_ENABLED"]
     .some((name) => env[name] === "true")) {

@@ -7,7 +7,7 @@ Required references and secrets:
 - API: `DATABASE_URL`, `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, bucket credentials, and a 32+ character `API_INTERNAL_TOKEN`.
 - Web: `API_BASE_URL=http://api.railway.internal:3000`, the same `API_INTERNAL_TOKEN`, `AUTH_SECRET`, `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`, `ALLOWED_GITHUB_LOGIN=Kaedeeeeeeeeee`.
 - Worker: API database/Bucket variables plus `TEMPORAL_ADDRESS=temporal.railway.internal:7233`.
-- Backup: `DATABASE_URL`, `BACKUP_BUCKET`, Bucket endpoint/region/credentials. `backup.railway.json` runs `pnpm backup:database` at 18:43 UTC every Sunday and exits.
+- Backup: `DATABASE_URL`, `BACKUP_ENCRYPTION_KEY`, `BACKUP_BUCKET`, Bucket endpoint/region/credentials. `backup.railway.json` runs `pnpm backup:database` at 18:43 UTC every Sunday and exits.
 - Temporal: `DB=postgres12`, `POSTGRES_SEEDS`, `POSTGRES_USER`, `POSTGRES_PWD`, `DBNAME=temporal`, `VISIBILITY_DBNAME=temporal_visibility` using private PostgreSQL networking.
 
 Before deploying each code-backed service, load its real Railway variables and run `pnpm deploy:preflight -- <service>`. Output contains variable names and validation problems only; it never prints secret values. After first deployment run `pnpm temporal:schedules` in the Worker service. Railway managed daily volume backups are the first recovery layer; the versioned weekly Bucket cron is independent.

@@ -155,9 +155,7 @@ services:
     cpus: 1.0
 
   backup:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile.worker
+    image: japan-job-agent-worker:latest
     profiles: ["maintenance"]
     depends_on:
       postgres:
@@ -165,7 +163,14 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-japan_job_agent}
       DEPLOYMENT_TARGET: linux
-      BACKUP_OUTPUT_PATH: /data/backups/japan-job-agent.dump
+      BACKUP_OUTPUT_PATH: /data/backups/japan-job-agent.dump.enc
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?set a base64-encoded 32-byte backup key}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:?set private R2 backup bucket}
+      S3_ENDPOINT: ${S3_ENDPOINT:?set the R2 S3 endpoint}
+      S3_REGION: ${S3_REGION:-auto}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?set scoped R2 access key}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set scoped R2 secret key}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
     volumes:
       - ${JJA_DATA_ROOT:-/srv/japan-job-agent}/backups:/data/backups
     command: ["pnpm", "backup:database"]

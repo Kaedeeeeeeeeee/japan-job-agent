@@ -1,6 +1,6 @@
 # Linux + Tailscale deployment
 
-PostgreSQL and immutable raw objects remain on the 16 GB Linux host. No R2 or public ingress is required. Only Web and API ports bind to the configured Tailscale IPv4 address; PostgreSQL and Temporal remain inside the Compose network.
+PostgreSQL and immutable raw objects remain on the 16 GB Linux host. Database backups are encrypted in the application before upload to a private Cloudflare R2 bucket. Only Web and API ports bind to the configured Tailscale IPv4 address; PostgreSQL and Temporal remain inside the Compose network.
 
 ## Host preparation
 
@@ -13,6 +13,8 @@ PostgreSQL and immutable raw objects remain on the 16 GB Linux host. No R2 or pu
    cp deploy/linux/.env.example deploy/linux/.env
    chmod 0600 deploy/linux/.env
    ```
+
+   Generate `BACKUP_ENCRYPTION_KEY` with `openssl rand -base64 32`. Configure the account-level R2 S3 endpoint, `S3_REGION=auto`, and an Object Read & Write token scoped only to the private backup bucket.
 
 4. Set the GitHub OAuth callback to `${AUTH_URL}/api/auth/callback/github`. The application still allows only `Kaedeeeeeeeeee`.
 
@@ -40,7 +42,7 @@ sudo systemctl enable --now japan-job-agent-promotion.timer
 sudo systemctl enable --now japan-job-agent-freshness.timer
 ```
 
-The daily Discovery jobs search the newest Talentio, Engage, and YOLO Japan entries plus every persisted public ATS tenant. Set `ENGAGE_DISCOVERY_MODE=pause_new` to observe existing Engage IDs from its sitemap without fetching or saving new Engage details. The source-expansion timer is inert while `SOURCE_EXPANSION_ENABLED=false`; after a backup, migration, and artifact dry-run, set it to `true` to scan at most 400 ranked tenants with four workers, a one-request-per-second host cap, and strict 30-day publication filtering. The later promotion job only advances candidates whose exact official Company–Source relationship can be verified, then reconciles Temporal schedules so sources with at least 100 current jobs run every 12 hours and smaller sources every 24 hours. At 08:30 JST, freshness applies the six-month retention policy. Backups remain local by default; copy one encrypted backup to a second user-controlled disk for machine-loss recovery.
+The daily Discovery jobs search the newest Talentio, Engage, and YOLO Japan entries plus every persisted public ATS tenant. Set `ENGAGE_DISCOVERY_MODE=pause_new` to observe existing Engage IDs from its sitemap without fetching or saving new Engage details. The source-expansion timer is inert while `SOURCE_EXPANSION_ENABLED=false`; after a backup, migration, and artifact dry-run, set it to `true` to scan at most 400 ranked tenants with four workers, a one-request-per-second host cap, and strict 30-day publication filtering. The later promotion job only advances candidates whose exact official Company–Source relationship can be verified, then reconciles Temporal schedules so sources with at least 100 current jobs run every 12 hours and smaller sources every 24 hours. At 08:30 JST, freshness applies the six-month retention policy. The backup timer writes an AES-256-GCM encrypted local staging file and uploads it to the private R2 backup bucket. Use `REQUIRE_ENCRYPTED_BACKUP=true` during disaster-recovery drills so a mislabeled plaintext object fails closed.
 
 Set repository variable `JJA_ENABLE_TAILSCALE_HEALTH=true` and secrets `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, and `JJA_TAILSCALE_HEALTH_URL` to enable the nightly private readiness check. A failed source audit or Tailscale health check opens (or comments on) the single `Nightly live health failed` GitHub issue, so repeated failures remain visible without creating one issue per day.
 

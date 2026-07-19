@@ -2,6 +2,7 @@ import pg from "pg";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { migrate } from "./migrate.js";
+import { assertKnownMigrationsApplied } from "./migration-verification.js";
 
 const { Client } = pg;
 const databaseUrl = process.env.DATABASE_URL;
@@ -11,9 +12,9 @@ await migrate(databaseUrl);
 const client = new Client({ connectionString: databaseUrl });
 await client.connect();
 try {
-  const result = await client.query<{ count: string }>("SELECT count(*)::text AS count FROM schema_migrations");
-  const expected = (await fs.readdir(path.resolve(import.meta.dirname, "../migrations"))).filter((file) => file.endsWith(".sql")).length;
-  if (Number(result.rows[0]?.count ?? 0) !== expected) throw new Error(`expected ${expected} migrations to be applied`);
+  const applied = await client.query<{ filename: string }>("SELECT filename FROM schema_migrations ORDER BY filename");
+  const known = (await fs.readdir(path.resolve(import.meta.dirname, "../migrations"))).filter((file) => file.endsWith(".sql"));
+  assertKnownMigrationsApplied(known, applied.rows.map(({ filename }) => filename));
 } finally {
   await client.end();
 }
